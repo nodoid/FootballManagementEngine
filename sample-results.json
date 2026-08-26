@@ -1,0 +1,12 @@
+{
+  "results": [
+    {
+      "fixtureId": "PUT-FIXTURE-ID-HERE",
+      "homeGoals": 2,
+      "awayGoals": 1,
+      "extraTime": false,
+      "homePenalties": null,
+      "awayPenalties": null
+    }
+  ]
+}

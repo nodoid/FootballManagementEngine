@@ -1,0 +1,14 @@
+{
+  "scenarioId": "dotnet-version-upgrade",
+  "operationId": "96b957f7-76af-4585-a2b7-9c1e4435c29e",
+  "description": "Upgrade .NET projects to newer .NET versions, including guidance on current release status, support lifecycle (LTS/STS), and recommended upgrade targets.",
+  "startTime": "2026-08-26T08:56:19.335685Z",
+  "lastUpdateTime": "2026-08-26T08:59:48.1487742Z",
+  "properties": {
+    "UpgradeTargetFramework": "net10.0",
+    "taskStates": {
+      "01-upgrade-footballmanagementengine": "Completed"
+    }
+  },
+  "folderPath": ""
+}
