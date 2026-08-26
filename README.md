@@ -1,6 +1,6 @@
 # Football Management Engine — Full Starter
 
-.NET 8 C# football management simulation engine.
+.NET 10 C# football management simulation engine.
 
 ## What is included
 
@@ -80,19 +80,6 @@ game.ApplyResultsJson(json);
 
 The club/player data is intentionally a generated starter database rather than a claim to contain the current official squads. For a commercial game, use appropriately licensed football data.
 
-## Recommended next development
+## Software License
 
-The engine is now ready for an API/UI layer. The next logical layer is ASP.NET Core Web API with endpoints such as:
-
-GET /api/leagues
-GET /api/leagues/{id}/table
-GET /api/fixtures
-GET /api/teams/{id}
-GET /api/players/{id}
-POST /api/results
-POST /api/transfers
-POST /api/seasons/generate
-POST /api/seasons/advance-week
-GET /api/save
-
-Then add a Blazor/React front end for the manager experience.
+This code is released under the ultra liberal (and some may say silly) DILLIGAF license. If you use it and it makes your computer explode - DILLIGAF. On the other hands, if you use it and it makes you a multi-millionaire, then again DILLIGAF.
