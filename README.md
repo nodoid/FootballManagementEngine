@@ -1,98 +1,163 @@
-# Football Management Engine — Full Starter
+# Football Management Engine
 
-.NET 8 C# football management simulation engine.
+A server-agnostic C# football management simulation engine targeting **.NET 10**.
 
-## What is included
+## Requirements
 
-### English pyramid
-- Premier League
-- Championship
-- League One
-- League Two
-- National League
+- .NET 10 SDK
 
-The seed database contains English club names and generated English player names.
+Verify the SDK with:
 
-### Competitions
-- League seasons
-- FA Cup
-- Carabao Cup
-- EFL Trophy
-- Champions League
-- Europa League
-- Conference League
-- European league-phase fixtures
+```powershell
+dotnet --version
+```
 
-### Core engine
-- Fixture generation
-- Results through JSON
-- Automatic league tables
-- Promotion/relegation
-- Match simulation
-- Player attributes
-- Injuries and suspensions fields
-- Transfers and contracts
-- Club finances
-- Weekly finance/player processing
-- Complete JSON save/load
+The project targets `net10.0` and does not reference ASP.NET Core, Kestrel, `HttpListener`, or any other HTTP server implementation.
 
-## Build and run
+## Run from the project root
 
-```bash
+After extracting the archive, open PowerShell in the extracted directory and run:
+
+```powershell
+dotnet restore
 dotnet build
 dotnet run
 ```
 
-## Result API format
+You can also use the supplied launchers:
 
-```json
-[
-  {
-    "fixtureId": "fixture-id",
-    "homeGoals": 2,
-    "awayGoals": 1,
-    "extraTime": false,
-    "homePenalties": null,
-    "awayPenalties": null
-  }
-]
+```powershell
+.\run.ps1
 ```
 
-The same JSON can be supplied to:
+On Windows CMD:
+
+```bat
+run.bat
+```
+
+On Linux/macOS:
+
+```bash
+./run.sh
+```
+
+## User team selection
+
+The application exposes a server-agnostic API through `src/GameApi.cs`. The user can retrieve the selectable team list, select a team, and retrieve the current selection.
+
+### List teams
+
+```http
+GET /api/teams
+```
+
+Response:
+
+```json
+{
+  "teams": [
+    {
+      "id": "ARS",
+      "name": "Arsenal",
+      "shortName": "ARS",
+      "leagueId": "PL"
+    }
+  ]
+}
+```
+
+### Select a team
+
+```http
+POST /api/game/select-team
+Content-Type: application/json
+
+{
+  "teamId": "ARS"
+}
+```
+
+A successful response is HTTP-style status `200` and contains the selected team.
+
+### Get the current selection
+
+```http
+GET /api/game
+```
+
+Response:
+
+```json
+{
+  "playerTeamId": "ARS",
+  "playerTeam": {
+    "id": "ARS",
+    "name": "Arsenal",
+    "shortName": "ARS",
+    "leagueId": "PL"
+  }
+}
+```
+
+If no team has been selected, `playerTeamId` and `playerTeam` are `null`.
+
+## Calling the API from a host
+
+`GameApi` deliberately does not open a network port. A host supplies the HTTP method, path, and optional request body and translates the returned `ApiResponse` into its own server response.
 
 ```csharp
-game.ApplyResultsJson(json);
+var response = api.Handle(
+    request.Method,
+    request.Path,
+    request.Body);
+
+// Host-specific response mapping:
+// status = response.StatusCode
+// body   = response.Body
+```
+
+This keeps the game/application layer independent of the server technology. The same API can be hosted by ASP.NET Core, a different .NET web framework, a serverless adapter, a custom server, or called directly by a client/test harness without changing `GameApi`.
+
+## JavaScript example
+
+```javascript
+const teamsResponse = await fetch('/api/teams');
+const { teams } = await teamsResponse.json();
+
+const selectedTeam = teams[0];
+
+const selectionResponse = await fetch('/api/game/select-team', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({ teamId: selectedTeam.id })
+});
+
+const selection = await selectionResponse.json();
+console.log(selection);
 ```
 
 ## Architecture
 
-- `Domain.cs` — state model
-- `FixtureGenerator.cs` — league/cup/European scheduling
-- `LeagueTable.cs` — standings
-- `MatchSimulator.cs` — basic match engine
-- `TransferEngine.cs` — transfers and weekly wages
-- `SeasonEngine.cs` — season generation and rollover operations
-- `GameEngine.cs` — main application service
-- `UkDatabase.cs` — English football seed data
-- `Program.cs` — executable example
+- `src/Domain.cs` — game state, teams, players, fixtures and results
+- `src/FixtureGenerator.cs` — fixture generation
+- `src/LeagueTable.cs` — league standings
+- `src/MatchSimulator.cs` — match simulation
+- `src/TransferEngine.cs` — transfers and weekly wages
+- `src/SeasonEngine.cs` — season generation and rollover
+- `src/GameEngine.cs` — main application/game service, including team selection and JSON save/load
+- `src/GameApi.cs` — server-agnostic API/application boundary
+- `src/UkDatabase.cs` — English football seed data
+- `src/Program.cs` — console example showing the API calls
 
-## Important production note
+## State and persistence
 
-The club/player data is intentionally a generated starter database rather than a claim to contain the current official squads. For a commercial game, use appropriately licensed football data.
+The selected team is stored in `GameState.PlayerTeamId`, so it is included in the normal JSON save/load state handled by the game engine.
 
-## Recommended next development
+## API documentation
 
-The engine is now ready for an API/UI layer. The next logical layer is ASP.NET Core Web API with endpoints such as:
+See [`docs/API.md`](docs/API.md) for the complete endpoint contract, request/response examples, host integration guidance, and error behaviour.
 
-GET /api/leagues
-GET /api/leagues/{id}/table
-GET /api/fixtures
-GET /api/teams/{id}
-GET /api/players/{id}
-POST /api/results
-POST /api/transfers
-POST /api/seasons/generate
-POST /api/seasons/advance-week
-GET /api/save
+## Data note
 
-Then add a Blazor/React front end for the manager experience.
+The club/player data is an illustrative generated starter database and is not intended to represent current official squads. A commercial product should use appropriately licensed football data.
