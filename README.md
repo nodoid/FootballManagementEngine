@@ -154,8 +154,10 @@ console.log(selection);
 
 The selected team is stored in `GameState.PlayerTeamId`, so it is included in the normal JSON save/load state handled by the game engine.
 
+## Software License
 ## API documentation
 
+This code is released under the ultra liberal (and some may say silly) DILLIGAF license. If you use it and it makes your computer explode - DILLIGAF. On the other hands, if you use it and it makes you a multi-millionaire, then again DILLIGAF.
 See [`docs/API.md`](docs/API.md) for the complete endpoint contract, request/response examples, host integration guidance, and error behaviour.
 
 ## Data note
