@@ -125,6 +125,8 @@ public sealed class TransferOffer
 
 public sealed class GameState
 {
+    /// <summary>Team selected by the human manager. Null until a team is selected.</summary>
+    public string? PlayerTeamId { get; set; }
     public int Season { get; set; } = 2026;
     public DateTime CurrentDateUtc { get; set; } = new(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
     public Dictionary<string, Team> Teams { get; init; } = new();

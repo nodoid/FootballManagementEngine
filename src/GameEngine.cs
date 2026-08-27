@@ -17,6 +17,26 @@ public sealed class FootballGameEngine
         State = state ?? new GameState();
 
     public void AddTeam(Team team) => State.Teams[team.Id] = team;
+
+    /// <summary>
+    /// Selects the club managed by the human player.
+    /// </summary>
+    public Team SelectPlayerTeam(string teamId)
+    {
+        if (string.IsNullOrWhiteSpace(teamId))
+            throw new ArgumentException("Team ID is required.", nameof(teamId));
+
+        if (!State.Teams.TryGetValue(teamId, out var team))
+            throw new KeyNotFoundException($"Team '{teamId}' not found.");
+
+        State.PlayerTeamId = team.Id;
+        return team;
+    }
+
+    public Team? GetPlayerTeam() =>
+        State.PlayerTeamId != null && State.Teams.TryGetValue(State.PlayerTeamId, out var team)
+            ? team
+            : null;
     public void AddLeague(League league) => State.Leagues[league.Id] = league;
     public void AddCompetition(Competition competition) =>
         State.Competitions[competition.Id] = competition;

@@ -1,16 +1,12 @@
-using System.Text.Json;
 using FootballManagementEngine;
 
 var game = UkDatabase.Create();
 var season = new SeasonEngine(game);
 
-Console.WriteLine($"English football database loaded: {game.State.Teams.Count} clubs.");
-
+// Generate the initial season data once at startup.
 season.GenerateDomesticSeason();
 season.GenerateFaCup();
 
-// Qualification is normally determined from the previous season.
-// This starter setup uses the top six as example European qualifiers.
 game.State.Competitions["UCL"].TeamIds.AddRange(
     new[] { "ARS", "LIV", "MCI", "MUN", "CHE", "NEW" });
 game.State.Competitions["UEL"].TeamIds.AddRange(
@@ -19,48 +15,26 @@ game.State.Competitions["UECL"].TeamIds.AddRange(
     new[] { "CRY", "FUL" });
 season.GenerateEuropeanFixtures();
 
-Console.WriteLine($"Fixtures generated: {game.State.Fixtures.Count:N0}");
+// Server-agnostic API layer. A web server, desktop app, mobile app, test,
+// or another process can call GameApi.Handle(method, path, body).
+var api = new GameApi(game);
 
-var firstFixtures = game.Fixtures("PL-COMP").Take(5).ToList();
-var simulator = new MatchSimulator();
+var teamsResponse = api.Handle("GET", GameApi.TeamsPath);
+Console.WriteLine($"Teams API: HTTP {teamsResponse.StatusCode}");
+Console.WriteLine(teamsResponse.Body);
 
-foreach (var fixture in firstFixtures)
-{
-    var result = simulator.Simulate(
-        fixture,
-        game.State.Teams[fixture.HomeTeamId],
-        game.State.Teams[fixture.AwayTeamId]);
+Console.WriteLine();
+Console.Write("Enter team ID to manage (e.g. ARS): ");
+var teamId = Console.ReadLine()?.Trim() ?? "";
 
-    game.ApplyResult(result);
-}
+var selectionResponse = api.Handle(
+    "POST",
+    GameApi.SelectTeamPath,
+    $"{{\"teamId\":\"{teamId.Replace("\\", "\\\\").Replace("\"", "\\\"")}\"}}");
 
-var table = game.GetLeagueTable("PL");
-Console.WriteLine("\nPremier League:");
-var position = 1;
-foreach (var row in table)
-{
-    Console.WriteLine(
-        $"{position++,2}. {row.TeamName,-28} " +
-        $"{row.Played,2} {row.Won,2} {row.Drawn,2} {row.Lost,2} " +
-        $"{row.GoalsFor,2}:{row.GoalsAgainst,2} " +
-        $"{row.GoalDifference,3} {row.Points,3}");
-}
+Console.WriteLine($"Select team API: HTTP {selectionResponse.StatusCode}");
+Console.WriteLine(selectionResponse.Body);
 
-var json = JsonSerializer.Serialize(
-    firstFixtures.Select((f, i) => new
-    {
-        fixtureId = f.Id,
-        homeGoals = i + 1,
-        awayGoals = i % 2
-    }), game.JsonOptions);
-
-Console.WriteLine("\nExample result JSON:");
-Console.WriteLine(json);
-
-// Save game.
-File.WriteAllText("savegame.json", game.ExportState());
-
-// Demonstrate reload.
-var reloaded = FootballGameEngine.ImportState(File.ReadAllText("savegame.json"));
-Console.WriteLine($"\nReloaded save: {reloaded.State.Teams.Count} teams, " +
-                  $"{reloaded.State.Fixtures.Count} fixtures.");
+var gameResponse = api.Handle("GET", GameApi.GamePath);
+Console.WriteLine($"Current game API: HTTP {gameResponse.StatusCode}");
+Console.WriteLine(gameResponse.Body);
