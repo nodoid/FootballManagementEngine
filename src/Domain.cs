@@ -14,6 +14,31 @@ public enum CompetitionType
 
 public enum Position { GK, DEF, MID, FWD }
 
+/// <summary>Supported tactical shapes. The shape changes the balance of attack, midfield and defence.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum Formation
+{
+    F442,
+    F433,
+    F4231,
+    F352,
+    F343,
+    F451,
+    F4141,
+    F532,
+    F541,
+    F41212
+}
+
+public sealed class CompetitionMatchRules
+{
+    /// <summary>Whether a drawn knockout match creates a replay instead of going straight to extra time.</summary>
+    public bool ReplayAllowed { get; init; }
+    public bool ExtraTimeAllowed { get; init; } = true;
+    public bool PenaltiesAllowed { get; init; } = true;
+    public int MaxReplays { get; init; } = 1;
+}
+
 public sealed class Player
 {
     public string Id { get; init; } = "";
@@ -35,6 +60,22 @@ public sealed class Player
     public int SuspensionMatches { get; set; }
 }
 
+public sealed class PlayerSeasonStats
+{
+    public string PlayerId { get; init; } = "";
+    public string TeamId { get; init; } = "";
+    public int Season { get; set; }
+    public int Appearances { get; set; }
+    public int Starts { get; set; }
+    public int Minutes { get; set; }
+    public int Goals { get; set; }
+    public int Assists { get; set; }
+    public int YellowCards { get; set; }
+    public int RedCards { get; set; }
+    public int CleanSheets { get; set; }
+    public int Injuries { get; set; }
+}
+
 public sealed class Team
 {
     public string Id { get; init; } = "";
@@ -47,6 +88,8 @@ public sealed class Team
     public decimal TransferBudget { get; set; } = 20_000_000m;
     public int Reputation { get; set; } = 70;
     public string ManagerName { get; set; } = "Alex Manager";
+    /// <summary>The tactical formation used for this team's matches.</summary>
+    public Formation Formation { get; set; } = Formation.F442;
 }
 
 public sealed class League
@@ -67,6 +110,7 @@ public sealed class Competition
     public CompetitionType Type { get; init; }
     public string? LeagueId { get; init; }
     public List<string> TeamIds { get; init; } = new();
+    public CompetitionMatchRules MatchRules { get; init; } = new();
 }
 
 public sealed class Fixture
@@ -102,6 +146,16 @@ public sealed class StandingRow
     public int Points { get; set; }
 }
 
+public enum MatchEventType { KickOff, Goal, Miss, Save, Chance, YellowCard, HalfTime, FullTime, ExtraTime, PenaltyShootout }
+
+public sealed class MatchHighlight
+{
+    [JsonPropertyName("minute")] public int Minute { get; init; }
+    [JsonPropertyName("teamId")] public string? TeamId { get; init; }
+    [JsonPropertyName("type")] public MatchEventType Type { get; init; }
+    [JsonPropertyName("description")] public string Description { get; init; } = "";
+}
+
 public sealed class MatchResult
 {
     [JsonPropertyName("fixtureId")] public string FixtureId { get; init; } = "";
@@ -111,6 +165,10 @@ public sealed class MatchResult
     [JsonPropertyName("homePenalties")] public int? HomePenalties { get; init; }
     [JsonPropertyName("awayPenalties")] public int? AwayPenalties { get; init; }
     [JsonPropertyName("dateUtc")] public DateTime? DateUtc { get; init; }
+    [JsonPropertyName("replayRequired")] public bool ReplayRequired { get; init; }
+    [JsonPropertyName("replayFixtureId")] public string? ReplayFixtureId { get; init; }
+    [JsonPropertyName("durationSeconds")] public int DurationSeconds { get; init; }
+    [JsonPropertyName("highlights")] public IReadOnlyList<MatchHighlight> Highlights { get; init; } = Array.Empty<MatchHighlight>();
 }
 
 public sealed class TransferOffer
@@ -134,4 +192,6 @@ public sealed class GameState
     public Dictionary<string, Competition> Competitions { get; init; } = new();
     public List<Fixture> Fixtures { get; init; } = new();
     public List<string> News { get; init; } = new();
+    /// <summary>Season aggregates are persisted so clients can query player statistics without rebuilding them.</summary>
+    public Dictionary<string, PlayerSeasonStats> PlayerStats { get; init; } = new();
 }

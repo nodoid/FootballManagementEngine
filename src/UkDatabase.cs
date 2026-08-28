@@ -2,9 +2,16 @@ namespace FootballManagementEngine;
 
 public static class UkDatabase
 {
-    public static FootballGameEngine Create()
+    public static FootballGameEngine Create() => Create(null, false, false);
+
+    /// <summary>Creates a new database-backed game, or optionally resumes the saved game in the requested slot.</summary>
+    public static FootballGameEngine Create(string? databasePath, bool loadExisting, bool autoSave = true, string slot = "default")
     {
-        var game = new FootballGameEngine();
+        var persistence = new GamePersistence(databasePath ?? GamePersistence.DefaultDatabasePath);
+        if (loadExisting && persistence.Exists(slot))
+            return persistence.Load(slot, autoSave);
+
+        var game = new FootballGameEngine(null, persistence, autoSave);
 
         AddLeague(game, "PL", "Premier League", 1, 20, 3, 3, 4);
         AddLeague(game, "CH", "Championship", 2, 24, 3, 3, 4);
@@ -133,19 +140,38 @@ public static class UkDatabase
         game.AddCompetition(new Competition
         {
             Id = "FA", Name = "FA Cup", Type = CompetitionType.FaCup,
-            TeamIds = game.State.Teams.Keys.ToList()
+            TeamIds = game.State.Teams.Keys.ToList(),
+            MatchRules = new CompetitionMatchRules
+            {
+                ReplayAllowed = true,
+                MaxReplays = 1,
+                ExtraTimeAllowed = true,
+                PenaltiesAllowed = true
+            }
         });
         game.AddCompetition(new Competition
         {
             Id = "CARABAO", Name = "Carabao Cup", Type = CompetitionType.LeagueCup,
             TeamIds = game.State.Leagues["PL"].TeamIds
-                .Concat(game.State.Leagues["CH"].TeamIds).ToList()
+                .Concat(game.State.Leagues["CH"].TeamIds).ToList(),
+            MatchRules = new CompetitionMatchRules
+            {
+                ReplayAllowed = false,
+                ExtraTimeAllowed = true,
+                PenaltiesAllowed = true
+            }
         });
         game.AddCompetition(new Competition
         {
             Id = "EFLT", Name = "EFL Trophy", Type = CompetitionType.EflTrophy,
             TeamIds = game.State.Leagues["L1"].TeamIds
-                .Concat(game.State.Leagues["L2"].TeamIds).ToList()
+                .Concat(game.State.Leagues["L2"].TeamIds).ToList(),
+            MatchRules = new CompetitionMatchRules
+            {
+                ReplayAllowed = false,
+                ExtraTimeAllowed = true,
+                PenaltiesAllowed = true
+            }
         });
         game.AddCompetition(new Competition
         {

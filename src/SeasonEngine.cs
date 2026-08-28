@@ -9,6 +9,7 @@ public sealed class SeasonEngine
 
     public void GenerateDomesticSeason()
     {
+        _game.ResetSeasonPlayerStats();
         foreach (var league in _game.State.Leagues.Values)
         {
             var competition = _game.State.Competitions.Values
@@ -70,6 +71,7 @@ public sealed class SeasonEngine
         }
 
         _game.State.CurrentDateUtc = _game.State.CurrentDateUtc.AddDays(7);
+        _game.SaveIfConfigured();
     }
 
     public void PromoteAndRelegate()

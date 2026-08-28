@@ -163,3 +163,143 @@ See [`docs/API.md`](docs/API.md) for the complete endpoint contract, request/res
 ## Data note
 
 The club/player data is an illustrative generated starter database and is not intended to represent current official squads. A commercial product should use appropriately licensed football data.
+
+### List fixtures
+
+```http
+GET /api/game/fixtures
+```
+
+Returns fixtures including their IDs, competition, teams, result, extra-time and
+penalty information. Use the fixture ID with the simulation endpoint.
+
+## Formations, simulation speed and highlights
+
+Each team now has a configurable `Formation`. Supported formations are:
+
+- `F442`
+- `F433`
+- `F4231`
+- `F352`
+- `F343`
+- `F451`
+- `F4141`
+- `F532`
+- `F541`
+- `F41212`
+
+Formation is part of the saved `Team` state and changes the simulated attacking,
+midfield and defensive balance, so it can change the probabilities of winning,
+drawing and losing rather than only changing presentation.
+
+### Change a formation
+
+```http
+POST /api/game/formation
+Content-Type: application/json
+
+{
+  "teamId": "ARS",
+  "formation": "F433"
+}
+```
+
+### Simulate a match
+
+```http
+POST /api/game/simulate
+Content-Type: application/json
+
+{
+  "fixtureId": "fixture-id",
+  "durationSeconds": 10,
+  "includeHighlights": true,
+  "highlightCount": 12,
+  "matchMinutes": 90,
+  "seed": 12345
+}
+```
+
+`durationSeconds` is the intended client/UI playback duration; the server-side
+simulation remains immediate. `matchMinutes` controls the simulated match length
+(default 90), while extra time adds a further 30 simulated minutes when enabled. The result contains timestamped highlights, goals,
+extra-time information and penalty-shootout information.
+
+### Cup match resolution
+
+Knockout competitions have `CompetitionMatchRules`:
+
+- `ReplayAllowed`
+- `MaxReplays`
+- `ExtraTimeAllowed`
+- `PenaltiesAllowed`
+
+The supplied English database configures the FA Cup with one replay followed by
+extra time/penalties if the replay is also drawn. The Carabao Cup and EFL Trophy
+go directly to extra time and penalties. These are configuration values, so a
+host/game can change them without changing the simulator.
+
+A drawn replayable match is automatically marked as played and a new replay
+fixture is added seven days later at the opposite venue. If no replay is
+permitted (or the replay limit has been reached), a knockout draw proceeds to
+extra time and then penalties when those rules are enabled.
+
+## SQLite save games
+
+The engine now supports optional SQLite persistence through `Microsoft.Data.Sqlite`.
+The database stores the complete `GameState` plus queryable snapshots for league tables,
+player season statistics and competition/cup configuration. Because the complete state is
+stored as JSON as well, fixtures, replay ties, formations, injuries, suspensions, budgets,
+transfers, news, dates and future state fields survive a restart without requiring a schema
+change for every new game-state property.
+
+### Start a new database-backed game
+
+```bash
+dotnet run -- --db football-management.db
+```
+
+### Resume a saved game
+
+```bash
+dotnet run -- --db football-management.db --load
+```
+
+Use a different save slot:
+
+```bash
+dotnet run -- --db football-management.db --load --slot career-2
+```
+
+### Save from the API
+
+`POST /api/game/save`
+
+```json
+{ "slot": "default" }
+```
+
+### Query persisted game information
+
+- `GET /api/game/standings` - all current league tables
+- `GET /api/game/player-stats` - player appearances, minutes, goals, assists, cards, clean sheets and current injury/suspension state
+- `GET /api/game/competitions` - league/cup/european competition configuration and teams
+- `GET /api/game/fixtures` - fixtures and completed cup results, including replays, extra time and penalties
+- `GET /api/game/save-slots` - available save slots
+
+### Automatic saving
+
+A database-backed game created with `autoSave: true` automatically saves important state
+changes such as team selection, formation changes, completed matches and weekly progression.
+A host can also call `game.Save("slot-name")` at safe checkpoints (for example when the app
+is backgrounded or closed).
+
+Injuries and suspensions are part of each `Player` and therefore survive a save/load cycle.
+Player season aggregates are stored in `GameState.PlayerStats` and in the SQLite `PlayerStats`
+table. League standings are recalculated from persisted fixtures and also materialised in the
+SQLite `LeagueStandings` table. Cup competitions, rules, ties, replays, extra time and penalty
+results are retained in the complete saved state and indexed competition snapshot.
+
+## License
+
+Released under the DILLIGAF license. 

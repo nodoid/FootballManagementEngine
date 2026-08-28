@@ -11,5 +11,9 @@
     <None Include=".github\upgrades\scenarios\dotnet-version-upgrade\plan.md" />
     <None Include=".github\upgrades\scenarios\dotnet-version-upgrade\scenario-instructions.md" />
     <None Include=".github\upgrades\scenarios\dotnet-version-upgrade\tasks\01-upgrade-footballmanagementengine\progress-details.md" />
+    <None Include="FootballManagementEngine.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.Sqlite" Version="11.0.0-preview.7.26381.103" />
   </ItemGroup>
 </Project>
