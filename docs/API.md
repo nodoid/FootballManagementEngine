@@ -169,3 +169,40 @@ await fetch('/api/game/select-team', {
 ## .NET target
 
 This release targets **.NET 10** (`net10.0`). The API contract itself is independent of the transport/server framework.
+
+
+### `POST /api/game/formation`
+
+Changes a team's tactical shape.
+
+```json
+{
+  "teamId": "ARS",
+  "formation": "F433"
+}
+```
+
+The formation is saved with the team and affects match simulation probabilities.
+
+### `POST /api/game/simulate`
+
+Runs and applies a fixture.
+
+```json
+{
+  "fixtureId": "fixture-id",
+  "durationSeconds": 10,
+  "includeHighlights": true,
+  "highlightCount": 12,
+  "matchMinutes": 90,
+  "seed": 12345
+}
+```
+
+The response includes the `MatchResult`, the updated fixture and, when applicable,
+the automatically created replay fixture. `durationSeconds` is a client playback
+duration and does not artificially slow the engine. `matchMinutes` controls the
+simulated regulation match length.
+
+For knockout matches, the competition's `MatchRules` determine whether a drawn
+match creates a replay, goes to extra time, or is decided by penalties.
