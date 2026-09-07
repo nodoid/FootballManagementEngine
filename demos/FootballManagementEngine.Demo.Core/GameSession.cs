@@ -77,6 +77,12 @@ public sealed class GameSession
             foreach (var team in game.State.Teams.Values) PickBestEleven(team);
             session._season.GenerateDomesticSeason();
             session._season.GenerateFaCup();
+
+            // The engine's calendar starts on 1 July, a month before anyone kicks a ball. Open
+            // on the first day of the season instead, so both demos start on matchday one.
+            if (game.State.Fixtures.Count > 0)
+                game.State.CurrentDateUtc = game.State.Fixtures.Min(f => f.DateUtc);
+
             game.Save(slot);
         }
 

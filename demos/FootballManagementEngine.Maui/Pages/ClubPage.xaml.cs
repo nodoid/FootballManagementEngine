@@ -33,9 +33,9 @@ public partial class ClubPage : ContentPage
         var managing = club is not null;
 
         ClubCard.IsVisible = managing;
-        ActionRow.IsVisible = managing;
+        AdvanceButton.IsVisible = managing;
         FormationRow.IsVisible = managing;
-        PickerPrompt.Text = managing ? "Switch club" : "Choose a club to manage";
+        PickerSection.IsVisible = !managing;
 
         if (club is null) return;
 
@@ -91,20 +91,6 @@ public partial class ClubPage : ContentPage
     private void OnAdvanceWeek(object? sender, EventArgs e)
     {
         _session.AdvanceWeek();
-        Refresh();
-    }
-
-    private async void OnChangeClub(object? sender, EventArgs e)
-    {
-        var confirmed = await DisplayAlertAsync(
-            "Change club",
-            "Leave your current club and pick another? Results already played are kept.",
-            "Change", "Stay");
-
-        if (!confirmed) return;
-
-        _session.Game.State.PlayerTeamId = null;
-        _session.Game.SaveIfConfigured();
         Refresh();
     }
 

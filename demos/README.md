@@ -82,13 +82,18 @@ Pick a club and you get:
   match unfolding. Every other fixture that day is simulated too, so the table stays honest.
 - **Table** — the live division table, your club highlighted.
 - **Squad** — appearances, goals and clean sheets per player, plus the wage bill.
-- **Club** (MAUI) — formation picker and *Advance a week*, which pays wages and heals injuries.
+- **Club** — the formation control and *Advance a week*, which pays wages and heals injuries.
+
+Both demos open on a title card, then the club picker. Picking a club is a one-way door: the
+picker is gone afterwards, because a manager stays at their club. A new game starts on the
+opening day of the season rather than the engine's default 1 July.
 
 ## Notes for the MonoGame demo
 
 - **No content pipeline.** Text uses a 5x7 bitmap font written as ASCII art in
   `PixelFont.cs` and baked into one texture at load, so there is no MGCB tool, no `.xnb`
-  build step and no font file to license or ship.
+  build step and no font file to license or ship. The MAUI splash screen is generated from
+  the same glyph data, so both apps share one wordmark.
 - **Fixed virtual canvas.** Everything is laid out in 360x640 and scaled to fit the device,
   so the layout is identical on every phone and tablet.
 - **Shared as source, not as a library.** MonoGame ships a different framework assembly per

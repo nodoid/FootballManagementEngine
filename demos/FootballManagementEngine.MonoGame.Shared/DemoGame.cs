@@ -15,7 +15,9 @@ public sealed class DemoGame : Game
     private enum Screen { Loading, ClubSelect, Hub, Match }
     private enum HubTab { Table, Squad }
 
-    private const int HeaderHeight = 40;
+    private const int HeaderHeight = 62;
+    private const int PickerHeaderHeight = 40;
+    private const float MinimumSplashSeconds = 1.6f;
     private const int RowHeight = 26;
 
     private readonly GraphicsDeviceManager _graphics;
@@ -34,6 +36,8 @@ public sealed class DemoGame : Game
 
     private readonly ScrollView _clubScroll = new();
     private readonly ScrollView _listScroll = new();
+
+    private float _splashSeconds;
 
     private MatchResult? _match;
     private FixtureCard? _matchFixture;
@@ -78,17 +82,22 @@ public sealed class DemoGame : Game
 
         if (_screen == Screen.Loading)
         {
+            _splashSeconds += elapsed;
+
             if (_loading is { IsCompletedSuccessfully: true })
             {
                 _session = _loading.Result;
                 _loading = null;
-                _screen = _session.Club is null ? Screen.ClubSelect : Screen.Hub;
             }
             else if (_loading is { IsFaulted: true })
             {
                 _loadingError = _loading.Exception?.GetBaseException().Message ?? "Unknown error";
                 _loading = null;
             }
+
+            // Hold the title card briefly even on a resumed save, which loads almost instantly.
+            if (_session is not null && _splashSeconds >= MinimumSplashSeconds)
+                _screen = _session.Club is null ? Screen.ClubSelect : Screen.Hub;
         }
         else if (_screen == Screen.Match)
         {
@@ -119,20 +128,32 @@ public sealed class DemoGame : Game
 
     // ---------- screens ----------
 
+    /// <summary>
+    /// The title card. Deliberately a plain blocky wordmark drawn from the demo's own pixel font,
+    /// in the spirit of an early-80s home-computer loading screen, rather than a copy of any
+    /// existing cover art.
+    /// </summary>
     private void DrawLoading()
     {
-        _ui.TextCentred(_batch, "FOOTBALL MANAGER", Ui.CanvasWidth / 2, 250, Palette.Accent, 2);
-        _ui.TextCentred(_batch, "ENGINE DEMO", Ui.CanvasWidth / 2, 274, Palette.Text, 2);
+        const int centre = Ui.CanvasWidth / 2;
+
+        _ui.TextCentred(_batch, "FOOTBALL", centre, 150, Palette.Text, 6);
+        _ui.TextCentred(_batch, "MANAGER", centre, 212, Palette.Text, 6);
+
+        // Underline sized to the wider of the two words, echoing the splash artwork.
+        var rule = _font.Measure("MANAGER", 6);
+        _ui.Fill(_batch, new Rectangle(centre - rule / 2, 274, rule, 3), Palette.Accent);
+        _ui.TextCentred(_batch, "ENGINE DEMO", centre, 292, Palette.Accent, 2);
 
         if (_loadingError.Length > 0)
         {
-            _ui.TextCentred(_batch, "COULD NOT START", Ui.CanvasWidth / 2, 330, Palette.Loss);
-            _ui.TextCentred(_batch, _font.Fit(_loadingError.ToUpperInvariant(), 330),
-                Ui.CanvasWidth / 2, 346, Palette.TextDim);
+            _ui.TextCentred(_batch, "COULD NOT START", centre, 400, Palette.Loss);
+            _ui.TextCentred(_batch, _font.Fit(_loadingError.ToUpperInvariant(), 330), centre, 416, Palette.TextDim);
         }
         else
         {
-            _ui.TextCentred(_batch, "BUILDING THE ENGLISH PYRAMID", Ui.CanvasWidth / 2, 330, Palette.TextDim);
+            var dots = new string('.', 1 + (int)(_splashSeconds * 2) % 3);
+            _ui.TextCentred(_batch, $"BUILDING THE ENGLISH PYRAMID{dots}", centre, 400, Palette.TextDim);
         }
     }
 
@@ -140,10 +161,10 @@ public sealed class DemoGame : Game
     {
         if (_session is null) return;
 
-        _ui.Fill(_batch, new Rectangle(0, 0, Ui.CanvasWidth, HeaderHeight), Palette.Panel);
+        _ui.Fill(_batch, new Rectangle(0, 0, Ui.CanvasWidth, PickerHeaderHeight), Palette.Panel);
         _ui.Text(_batch, "CHOOSE A CLUB", 12, 14, Palette.Text, 2);
 
-        var viewport = new Rectangle(0, HeaderHeight, Ui.CanvasWidth, Ui.CanvasHeight - HeaderHeight);
+        var viewport = new Rectangle(0, PickerHeaderHeight, Ui.CanvasWidth, Ui.CanvasHeight - PickerHeaderHeight);
         var divisions = _session.Divisions;
         var contentHeight = divisions.Sum(d => 22 + _session.Clubs.Count(c => c.LeagueId == d.Id) * RowHeight);
 
@@ -177,7 +198,7 @@ public sealed class DemoGame : Game
         }
 
         // Redraw the header over any row that scrolled beneath it.
-        _ui.Fill(_batch, new Rectangle(0, 0, Ui.CanvasWidth, HeaderHeight), Palette.Panel);
+        _ui.Fill(_batch, new Rectangle(0, 0, Ui.CanvasWidth, PickerHeaderHeight), Palette.Panel);
         _ui.Text(_batch, "CHOOSE A CLUB", 12, 14, Palette.Text, 2);
 
         if (chosen is not null)
@@ -192,17 +213,23 @@ public sealed class DemoGame : Game
     {
         if (_session?.Club is not { } club) { _screen = Screen.ClubSelect; return; }
 
-        // Header.
+        // Header - the same facts, in the same words, as the MAUI demo's club card.
         _ui.Fill(_batch, new Rectangle(0, 0, Ui.CanvasWidth, HeaderHeight), Palette.Panel);
-        _ui.Text(_batch, _font.Fit(club.Name.ToUpperInvariant(), 250, 2), 12, 8, Palette.Text, 2);
-        _ui.Text(_batch, $"{_session.LeagueName(club.LeagueId).ToUpperInvariant()}  {_session.CurrentDateUtc:d MMM yyyy}".ToUpperInvariant(),
-            12, 26, Palette.TextDim);
+        _ui.Text(_batch, _font.Fit(club.Name.ToUpperInvariant(), 336, 2), 12, 8, Palette.Text, 2);
+        _ui.Text(_batch, _session.LeagueName(club.LeagueId).ToUpperInvariant(), 12, 26, Palette.TextDim);
 
+        var table = _session.Table;
         var position = _session.TablePosition;
-        if (position > 0) _ui.TextRight(_batch, $"{position}", Ui.CanvasWidth - 12, 12, Palette.Accent, 2);
+        var points = table.FirstOrDefault(r => r.TeamId == club.Id)?.Points ?? 0;
+        _ui.Text(_batch, position > 0
+                ? $"{Ordinal(position)} OF {table.Count} - {points} PTS"
+                : "SEASON NOT STARTED",
+            12, 38, Palette.Accent);
+        _ui.Text(_batch, $"SEASON {_session.Season} - {_session.CurrentDateUtc:ddd d MMM yyyy}".ToUpperInvariant(),
+            12, 50, Palette.TextDim);
 
         // Next fixture.
-        var card = new Rectangle(8, 46, Ui.CanvasWidth - 16, 48);
+        var card = new Rectangle(8, 66, Ui.CanvasWidth - 16, 48);
         _ui.Panel(_batch, card);
         if (_session.NextFixture is { } next)
         {
@@ -218,32 +245,35 @@ public sealed class DemoGame : Game
         }
 
         // Actions.
-        var play = new Rectangle(8, 102, 216, 30);
-        var week = new Rectangle(232, 102, Ui.CanvasWidth - 240, 30);
+        var play = new Rectangle(8, 122, 216, 30);
+        var week = new Rectangle(232, 122, Ui.CanvasWidth - 240, 30);
         var canPlay = _session.NextFixture is not null;
 
         if (_ui.Button(_batch, play, "PLAY MATCH", canPlay)) StartMatch();
         if (_ui.Button(_batch, week, "WEEK +1")) _session.AdvanceWeek();
 
+        // Formation, the same control the MAUI club page offers.
+        var formationRow = new Rectangle(8, 160, Ui.CanvasWidth - 16, 26);
+        _ui.Panel(_batch, formationRow, Palette.PanelAlt);
+        var previous = new Rectangle(formationRow.X + 3, formationRow.Y + 3, 28, 20);
+        var following = new Rectangle(formationRow.Right - 31, formationRow.Y + 3, 28, 20);
+        if (_ui.Button(_batch, previous, "<")) CycleFormation(-1);
+        if (_ui.Button(_batch, following, ">")) CycleFormation(1);
+        _ui.TextCentred(_batch, $"FORMATION {FormationLabel(club.Formation)}",
+            formationRow.Center.X, formationRow.Y + 10, Palette.Text);
+
         // Tabs.
-        var tableTab = new Rectangle(8, 140, 100, 24);
-        var squadTab = new Rectangle(112, 140, 100, 24);
+        var tableTab = new Rectangle(8, 194, 100, 24);
+        var squadTab = new Rectangle(112, 194, 100, 24);
         DrawTab(tableTab, "TABLE", HubTab.Table);
         DrawTab(squadTab, "SQUAD", HubTab.Squad);
 
         // List.
-        var viewport = new Rectangle(0, 170, Ui.CanvasWidth, 428);
+        var viewport = new Rectangle(0, 224, Ui.CanvasWidth, Ui.CanvasHeight - 224);
         if (_tab == HubTab.Table) DrawTable(viewport, club.Id, elapsed);
         else DrawSquad(viewport, elapsed);
 
-        var change = new Rectangle(8, Ui.CanvasHeight - 38, Ui.CanvasWidth - 16, 30);
-        if (_ui.Button(_batch, change, "CHANGE CLUB"))
-        {
-            _session.Game.State.PlayerTeamId = null;
-            _session.Game.SaveIfConfigured();
-            _clubScroll.Reset();
-            _screen = Screen.ClubSelect;
-        }
+        // No way back to the picker: once a club is chosen, the manager stays at that club.
     }
 
     private void DrawTab(Rectangle rectangle, string label, HubTab tab)
@@ -405,6 +435,29 @@ public sealed class DemoGame : Game
 
         if (_match is not null) _screen = Screen.Match;
     }
+
+    private void CycleFormation(int direction)
+    {
+        if (_session?.Club is not { } club) return;
+
+        var all = Enum.GetValues<Formation>();
+        var index = (Array.IndexOf(all, club.Formation) + direction + all.Length) % all.Length;
+        _session.SetFormation(all[index]);
+    }
+
+    /// <summary>Turns the enum name (F4231) into something readable (4-2-3-1), as MAUI does.</summary>
+    private static string FormationLabel(Formation formation) =>
+        string.Join('-', formation.ToString().TrimStart('F').ToCharArray());
+
+    /// <summary>Matches the ordinal wording on the MAUI club card ("12th of 20").</summary>
+    private static string Ordinal(int value) => value switch
+    {
+        11 or 12 or 13 => $"{value}TH",
+        _ when value % 10 == 1 => $"{value}ST",
+        _ when value % 10 == 2 => $"{value}ND",
+        _ when value % 10 == 3 => $"{value}RD",
+        _ => $"{value}TH"
+    };
 
     private static (string Label, Color Colour) Verdict(int forGoals, int againstGoals) =>
         forGoals > againstGoals ? ("WIN", Palette.Win)

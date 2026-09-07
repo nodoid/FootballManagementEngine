@@ -159,6 +159,9 @@ public sealed class Ui : IDisposable
 /// <summary>Keeps a scroll offset inside its bounds and applies drag and flick momentum.</summary>
 public sealed class ScrollView
 {
+    /// <summary>Roughly three screens a second - past this a flick is unreadable anyway.</summary>
+    private const float MaxVelocity = 1800f;
+
     private float _velocity;
 
     public float Offset { get; private set; }
@@ -167,14 +170,20 @@ public sealed class ScrollView
     {
         var maximum = Math.Max(0f, contentHeight - viewportHeight);
 
+        // The frame time is unreliable on the first frames and during a hitch, and dividing a
+        // drag by a near-zero one turns a pixel of touch jitter into a fling across the whole
+        // list. Clamp the step, blend the estimate, and cap the result.
+        var step = Math.Clamp(elapsedSeconds, 1f / 240f, 1f / 20f);
+
         if (ui.IsTouching)
         {
             Offset -= ui.DragY;
-            _velocity = -ui.DragY / Math.Max(elapsedSeconds, 0.0001f);
+            var instant = Math.Clamp(-ui.DragY / step, -MaxVelocity, MaxVelocity);
+            _velocity = _velocity * 0.6f + instant * 0.4f;
         }
         else if (Math.Abs(_velocity) > 1f)
         {
-            Offset += _velocity * elapsedSeconds;
+            Offset += _velocity * step;
             _velocity *= 0.9f;
         }
         else
