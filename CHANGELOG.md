@@ -30,6 +30,10 @@
 - `MatchSimulationOptions.InjuryChance` controls how often this happens (zero disables it).
 - Every club is now seeded with two goalkeepers, so there is cover in goal and a keeper
   available for the bench.
+- Cover for an unavailable player is now like for like: the first eleven in squad order are
+  the intended side, and anyone missing is replaced by an available player of the same
+  position where the squad allows it, falling back to the next available player otherwise.
+  An injured defender no longer pulls the reserve goalkeeper into the back four.
 
 ## Formation and match simulation update
 

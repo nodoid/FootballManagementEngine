@@ -87,7 +87,9 @@ Pick a club and you get:
 - **Injuries and substitutions** — a player can limp off mid-match. The clock stops on the
   minute it happens, the bench is offered, and play resumes to full time once a replacement
   is named. Squad order *is* team selection, so the substitute simply takes the injured
-  player's place and the engine re-reads the eleven.
+  player's place and the engine re-reads the eleven. Until a choice is made the engine covers
+  like for like, so the side keeps its shape rather than pulling the reserve keeper into
+  defence.
 - **Club** — the formation control and *Advance a week*, which pays wages and heals injuries.
 
 Both demos open on a title card, then the club picker. Picking a club is a one-way door: the

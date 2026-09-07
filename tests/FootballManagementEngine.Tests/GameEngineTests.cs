@@ -1610,3 +1610,126 @@ public class MatchInjuryTests
         Assert.That(second, Is.EqualTo(first));
     }
 }
+
+[TestFixture]
+public class LikeForLikeCoverTests
+{
+    /// <summary>A squad laid out the way the demos lay one out: a 4-4-2, then a mixed bench.</summary>
+    private static Team ShapedSquad()
+    {
+        var team = TestData.MakeTeam("A", squadSize: 0);
+        void Add(string id, Position position, int overall) =>
+            team.Players.Add(TestData.MakePlayer(id, position, overall));
+
+        Add("GK1", Position.GK, 80);
+        for (var i = 1; i <= 4; i++) Add($"DF{i}", Position.DEF, 80 - i);
+        for (var i = 1; i <= 4; i++) Add($"MF{i}", Position.MID, 80 - i);
+        for (var i = 1; i <= 2; i++) Add($"FW{i}", Position.FWD, 80 - i);
+
+        // Bench: one of each.
+        Add("GK2", Position.GK, 60);
+        Add("DF5", Position.DEF, 62);
+        Add("MF5", Position.MID, 63);
+        Add("FW3", Position.FWD, 64);
+
+        return team;
+    }
+
+    [Test]
+    public void AnInjuredDefender_IsCoveredByADefenderNotTheReserveKeeper()
+    {
+        var team = ShapedSquad();
+        team.Players.Single(p => p.Id == "DF2").Injured = true;
+
+        var eleven = FootballGameEngine.StartingEleven(team).Select(p => p.Id).ToList();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(eleven, Does.Contain("DF5"));
+            Assert.That(eleven, Does.Not.Contain("GK2"), "the reserve keeper must not fill a defender's slot");
+            Assert.That(eleven, Has.Count.EqualTo(11));
+        });
+    }
+
+    [Test]
+    public void AnInjuredKeeper_IsCoveredByTheReserveKeeper()
+    {
+        var team = ShapedSquad();
+        team.Players.Single(p => p.Id == "GK1").Injured = true;
+
+        var eleven = FootballGameEngine.StartingEleven(team).Select(p => p.Id).ToList();
+
+        Assert.That(eleven, Does.Contain("GK2"));
+    }
+
+    [Test]
+    public void TheElevenKeepsItsShapeWhenSeveralPlayersDropOut()
+    {
+        var team = ShapedSquad();
+        team.Players.Single(p => p.Id == "MF1").Injured = true;
+        team.Players.Single(p => p.Id == "FW1").SuspensionMatches = 1;
+
+        var eleven = FootballGameEngine.StartingEleven(team).ToList();
+        var shape = eleven.GroupBy(p => p.Position).ToDictionary(g => g.Key, g => g.Count());
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(eleven, Has.Count.EqualTo(11));
+            Assert.That(shape[Position.GK], Is.EqualTo(1));
+            Assert.That(shape[Position.DEF], Is.EqualTo(4));
+            Assert.That(shape[Position.MID], Is.EqualTo(4));
+            Assert.That(shape[Position.FWD], Is.EqualTo(2));
+        });
+    }
+
+    [Test]
+    public void WithNoLikeForLikeCover_TheBestAvailablePlayerFillsIn()
+    {
+        var team = ShapedSquad();
+        team.Players.RemoveAll(p => p.Id == "GK2");
+        team.Players.Single(p => p.Id == "GK1").Injured = true;
+
+        var eleven = FootballGameEngine.StartingEleven(team).ToList();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(eleven, Has.Count.EqualTo(11), "a club still fields eleven");
+            Assert.That(eleven.Any(p => p.Position == Position.GK), Is.False, "there is simply no keeper left");
+        });
+    }
+
+    [Test]
+    public void ThePromotedPlayerIsNoLongerOfferedAsASubstitute()
+    {
+        var team = ShapedSquad();
+        team.Players.Single(p => p.Id == "DF2").Injured = true;
+
+        var eleven = FootballGameEngine.StartingEleven(team).Select(p => p.Id).ToList();
+        var bench = FootballGameEngine.Substitutes(team).Select(p => p.Id).ToList();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(bench, Does.Not.Contain("DF5"), "DF5 is now starting");
+            Assert.That(eleven.Intersect(bench), Is.Empty);
+            Assert.That(bench, Is.EquivalentTo(new[] { "GK2", "MF5", "FW3" }));
+        });
+    }
+
+    [Test]
+    public void AnInjuredStarterIsNeverPickedAgain()
+    {
+        var engine = new FootballGameEngine();
+        var team = ShapedSquad();
+        engine.AddTeam(team);
+        var injured = team.Players.Single(p => p.Id == "MF3");
+
+        engine.SetPlayerInjury(injured.Id, 2);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(injured.State, Is.EqualTo(PlayerState.Injured));
+            Assert.That(team.Players.Single(p => p.Id == "MF5").State, Is.EqualTo(PlayerState.Selected));
+            Assert.That(team.Players.Count(p => p.Selected), Is.EqualTo(11));
+        });
+    }
+}

@@ -70,21 +70,51 @@ public sealed class FootballGameEngine
     /// Squad order is therefore team selection, and this is the single definition of it - the
     /// simulator's ratings, the appearance statistics and the Selected flag all read from here.
     /// </summary>
-    public static IReadOnlyList<Player> StartingEleven(Team team) =>
-        Available(team).Take(11).ToList();
+    public static IReadOnlyList<Player> StartingEleven(Team team)
+    {
+        // The first eleven in squad order are the intended side; that is what squad order means.
+        var intended = team.Players.Take(11).ToList();
+        var eleven = intended.Where(IsAvailable).ToList();
+
+        var missing = intended.Where(p => !IsAvailable(p)).ToList();
+        if (missing.Count == 0) return eleven;
+
+        // Anyone unavailable is covered like for like where the squad allows it, so an injured
+        // defender is replaced by a defender rather than by whoever happens to be next in line.
+        var cover = team.Players.Skip(11).Where(IsAvailable).ToList();
+        var taken = new HashSet<string>();
+
+        foreach (var absentee in missing)
+        {
+            var replacement =
+                cover.FirstOrDefault(p => !taken.Contains(p.Id) && p.Position == absentee.Position)
+                ?? cover.FirstOrDefault(p => !taken.Contains(p.Id));
+
+            if (replacement is null) break;
+            taken.Add(replacement.Id);
+            eleven.Add(replacement);
+        }
+
+        return eleven;
+    }
 
     /// <summary>How many substitutes a club names alongside its starting eleven.</summary>
     public const int SubstituteCount = 4;
 
     /// <summary>
-    /// The named substitutes: the next <see cref="SubstituteCount"/> available players after the
-    /// starting eleven. Anyone beyond them is a reserve and is not in the matchday squad.
+    /// The named substitutes: the next <see cref="SubstituteCount"/> available players in squad
+    /// order who are not already starting. Anyone beyond them is a reserve, outside the squad.
     /// </summary>
-    public static IReadOnlyList<Player> Substitutes(Team team) =>
-        Available(team).Skip(11).Take(SubstituteCount).ToList();
+    public static IReadOnlyList<Player> Substitutes(Team team)
+    {
+        var eleven = StartingEleven(team).Select(p => p.Id).ToHashSet();
+        return team.Players
+            .Where(p => IsAvailable(p) && !eleven.Contains(p.Id))
+            .Take(SubstituteCount)
+            .ToList();
+    }
 
-    private static IEnumerable<Player> Available(Team team) =>
-        team.Players.Where(p => !p.Injured && p.SuspensionMatches == 0);
+    private static bool IsAvailable(Player player) => !player.Injured && player.SuspensionMatches == 0;
 
     /// <summary>
     /// Brings every player's <see cref="Player.Selected"/> flag back in line with the current
