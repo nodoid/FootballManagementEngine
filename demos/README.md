@@ -59,6 +59,16 @@ The Windows target is added only when the build is running on Windows, which is 
 Windows app from macOS or Linux. It is packaged as an unpackaged app (`WindowsPackageType`
 is `None`), so it runs with a plain `-t:Run` and needs no signing or Store identity.
 
+On Windows the project still lists the Android, iOS and Mac Catalyst targets, and restore
+evaluates every one of them, so a Windows-only machine needs those workloads present even
+to build the Windows head. Install what the project asks for first:
+
+```bash
+dotnet workload restore demos/FootballManagementEngine.Maui/FootballManagementEngine.Maui.csproj
+```
+
+Without it the build stops at `NETSDK1147: the following workloads must be installed: android`.
+
 ## What the demos do
 
 On first launch the session builds the full pyramid — 5 divisions, 116 clubs, 2,552
