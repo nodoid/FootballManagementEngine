@@ -650,7 +650,7 @@ public class GameEngineApplyResultTests
     }
 
     [Test]
-    public void ApplyResult_AttributesGoalsToStartersInOrder()
+    public void ApplyResult_CreditsEachGoalToAnAttackingPlayer()
     {
         var home = _engine.State.Teams[_fixture.HomeTeamId];
 
@@ -664,13 +664,126 @@ public class GameEngineApplyResultTests
             ]
         });
 
+        var scorers = home.Players
+            .Where(p => _engine.State.PlayerStats[p.Id].Goals > 0)
+            .ToList();
+
         Assert.Multiple(() =>
         {
-            Assert.That(_engine.State.PlayerStats[home.Players[0].Id].Goals, Is.EqualTo(1));
-            Assert.That(_engine.State.PlayerStats[home.Players[1].Id].Goals, Is.EqualTo(1));
-            Assert.That(_engine.State.PlayerStats[home.Players[2].Id].Goals, Is.Zero);
             Assert.That(_engine.State.PlayerStats.Values.Sum(s => s.Goals), Is.EqualTo(2));
+            Assert.That(scorers.Select(p => p.Position), Is.All.Not.EqualTo(Position.GK));
+            Assert.That(scorers.Select(p => p.Position), Is.All.AnyOf(Position.MID, Position.FWD, Position.DEF));
         });
+    }
+
+    [Test]
+    public void ApplyResult_NeverCreditsAGoalToTheGoalkeeper()
+    {
+        // Every minute of a match, so any minute-derived scorer would be caught.
+        var home = _engine.State.Teams[_fixture.HomeTeamId];
+        var keeper = home.Players.First(p => p.Position == Position.GK);
+        var highlights = Enumerable.Range(1, 90)
+            .Select(minute => new MatchHighlight { Minute = minute, TeamId = home.Id, Type = MatchEventType.Goal })
+            .ToList();
+
+        _engine.ApplyResult(new MatchResult
+        {
+            FixtureId = _fixture.Id, HomeGoals = 90, AwayGoals = 0, Highlights = highlights
+        });
+
+        Assert.That(_engine.State.PlayerStats[keeper.Id].Goals, Is.Zero);
+    }
+
+    [Test]
+    public void ApplyResult_FavoursForwardsOverDefenders()
+    {
+        var home = _engine.State.Teams[_fixture.HomeTeamId];
+        var highlights = Enumerable.Range(1, 90)
+            .Select(minute => new MatchHighlight { Minute = minute, TeamId = home.Id, Type = MatchEventType.Goal })
+            .ToList();
+
+        _engine.ApplyResult(new MatchResult
+        {
+            FixtureId = _fixture.Id, HomeGoals = 90, AwayGoals = 0, Highlights = highlights
+        });
+
+        var byPosition = home.Players
+            .GroupBy(p => p.Position)
+            .ToDictionary(g => g.Key, g => g.Sum(p => _engine.State.PlayerStats[p.Id].Goals));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(byPosition.GetValueOrDefault(Position.FWD), Is.GreaterThan(byPosition.GetValueOrDefault(Position.DEF)));
+            Assert.That(byPosition.GetValueOrDefault(Position.MID), Is.GreaterThan(byPosition.GetValueOrDefault(Position.DEF)));
+            Assert.That(byPosition.GetValueOrDefault(Position.GK), Is.Zero);
+        });
+    }
+
+    [Test]
+    public void ApplyResult_AttributesTheSameGoalToTheSamePlayerEveryTime()
+    {
+        var highlights = new List<MatchHighlight>
+        {
+            new() { Minute = 23, TeamId = "T1", Type = MatchEventType.Goal },
+            new() { Minute = 64, TeamId = "T1", Type = MatchEventType.Goal }
+        };
+
+        static Dictionary<string, int> Play(List<MatchHighlight> goals)
+        {
+            var engine = TestData.MakeLeagueWorld();
+            var fixture = engine.State.Fixtures.First(f => f.HomeTeamId == "T1");
+            engine.ApplyResult(new MatchResult
+            {
+                FixtureId = fixture.Id, HomeGoals = 2, AwayGoals = 0, Highlights = goals
+            });
+            return engine.State.Teams["T1"].Players
+                .ToDictionary(p => p.Id, p => engine.State.PlayerStats[p.Id].Goals);
+        }
+
+        Assert.That(Play(highlights), Is.EqualTo(Play(highlights)));
+    }
+
+    [Test]
+    public void ApplyResult_WithOnlyAGoalkeeperAvailable_StillCreditsTheGoal()
+    {
+        var engine = new FootballGameEngine();
+        var solo = TestData.MakeTeam("SOLO", squadSize: 1);
+        engine.AddTeam(solo);
+        engine.AddTeam(TestData.MakeTeam("AWY"));
+        engine.AddCompetition(TestData.MakeCompetition("C"));
+        var fixture = TestData.MakeFixture("C", "SOLO", "AWY");
+        engine.State.Fixtures.Add(fixture);
+
+        engine.ApplyResult(new MatchResult
+        {
+            FixtureId = fixture.Id, HomeGoals = 1, AwayGoals = 0,
+            Highlights = [new MatchHighlight { Minute = 30, TeamId = "SOLO", Type = MatchEventType.Goal }]
+        });
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(solo.Players[0].Position, Is.EqualTo(Position.GK));
+            Assert.That(engine.State.PlayerStats[solo.Players[0].Id].Goals, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void ApplyResult_CreditsNoMoreGoalsThanWereScored()
+    {
+        var home = _engine.State.Teams[_fixture.HomeTeamId];
+
+        _engine.ApplyResult(new MatchResult
+        {
+            FixtureId = _fixture.Id, HomeGoals = 1, AwayGoals = 0,
+            Highlights =
+            [
+                new MatchHighlight { Minute = 10, TeamId = home.Id, Type = MatchEventType.Goal },
+                new MatchHighlight { Minute = 20, TeamId = home.Id, Type = MatchEventType.Goal },
+                new MatchHighlight { Minute = 30, TeamId = home.Id, Type = MatchEventType.Goal }
+            ]
+        });
+
+        Assert.That(_engine.State.PlayerStats.Values.Sum(s => s.Goals), Is.EqualTo(1));
     }
 
     [Test]

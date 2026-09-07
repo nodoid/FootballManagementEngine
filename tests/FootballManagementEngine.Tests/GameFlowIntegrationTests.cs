@@ -197,6 +197,36 @@ public class GameFlowIntegrationTests
     }
 
     [Test]
+    public void AFullLeagueSeason_TopScorersAreAttackers()
+    {
+        var game = TestData.MakeLeagueWorld(teamCount: 8);
+        var seed = 1;
+
+        foreach (var fixture in game.State.Fixtures.ToList())
+            game.SimulateFixture(fixture.Id, new MatchSimulationOptions { HighlightCount = 8 }, seed++);
+
+        var goalsByPosition = game.State.Teams.Values
+            .SelectMany(t => t.Players)
+            .GroupBy(p => p.Position)
+            .ToDictionary(g => g.Key, g => g.Sum(p => game.State.PlayerStats[p.Id].Goals));
+
+        var leadingScorer = game.State.Teams.Values
+            .SelectMany(t => t.Players)
+            .OrderByDescending(p => game.State.PlayerStats[p.Id].Goals)
+            .First();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(goalsByPosition.GetValueOrDefault(Position.GK), Is.Zero,
+                "goalkeepers must not appear on the scoring charts");
+            Assert.That(goalsByPosition.GetValueOrDefault(Position.FWD),
+                Is.GreaterThan(goalsByPosition.GetValueOrDefault(Position.DEF)));
+            Assert.That(leadingScorer.Position, Is.AnyOf(Position.FWD, Position.MID));
+            Assert.That(goalsByPosition.Values.Sum(), Is.GreaterThan(0));
+        });
+    }
+
+    [Test]
     public void ASeasonRollover_PromotesRelegatesAndRebuildsTheCalendar()
     {
         var game = UkDatabase.Create(_databasePath, loadExisting: false, autoSave: false);

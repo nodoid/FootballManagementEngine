@@ -7,6 +7,9 @@
   engines, SQLite persistence, the API layer and end-to-end game flows.
 - Fixed clean sheets being credited to the side that failed to score instead of the side
   that conceded nothing.
+- Fixed goal attribution: goals went round-robin from the first player in the squad, which
+  made the goalkeeper every club's top scorer. Goals are now credited to attacking players,
+  weighted by position, and chosen by the goal's minute so attribution stays deterministic.
 - Fixed relegated clubs falling two divisions in one pass: every league table is now
   snapshotted before any club moves.
 - Balanced the promotion and relegation places so divisions keep their size across seasons

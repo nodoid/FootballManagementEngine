@@ -326,9 +326,10 @@ public sealed class FootballGameEngine
         }
 
         var goalHighlights = highlights.Where(h => h.Type == MatchEventType.Goal && h.TeamId == team.Id).ToList();
-        for (var i = 0; i < Math.Min(goals, goalHighlights.Count); i++)
+        var scorers = ScorerPool(starters);
+        foreach (var goal in goalHighlights.Take(Math.Min(goals, goalHighlights.Count)))
         {
-            var player = starters[i % starters.Count];
+            var player = scorers[Math.Abs(goal.Minute) % scorers.Count];
             State.PlayerStats[player.Id].Goals++;
         }
         foreach (var card in highlights.Where(h => h.TeamId == team.Id && h.Type == MatchEventType.YellowCard))
@@ -337,6 +338,31 @@ public sealed class FootballGameEngine
             State.PlayerStats[player.Id].YellowCards++;
         }
     }
+
+    /// <summary>
+    /// The players a goal can be credited to, each repeated according to how likely they are to
+    /// score, so a forward is three times as likely as a defender and a goalkeeper never is.
+    /// The scorer is then chosen by the goal's minute, which keeps attribution deterministic for
+    /// a given seed while still spreading goals around the front line across a season.
+    /// </summary>
+    private static List<Player> ScorerPool(IReadOnlyList<Player> starters)
+    {
+        var pool = new List<Player>();
+        foreach (var player in starters)
+            for (var i = 0; i < GoalThreat(player.Position); i++)
+                pool.Add(player);
+
+        // A club with nobody but a goalkeeper available still has to credit its goals to someone.
+        return pool.Count > 0 ? pool : [.. starters];
+    }
+
+    private static int GoalThreat(Position position) => position switch
+    {
+        Position.FWD => 3,
+        Position.MID => 2,
+        Position.DEF => 1,
+        _ => 0
+    };
 
     public void ApplyResultsJson(string json)
     {
