@@ -318,6 +318,10 @@ main build stays fast:
 - **MonoGame** (`Android`, `iOS`) - a touch-driven game rendering the same season, with a
   match screen that replays the engine's highlights against a running clock.
 
+Both cover team selection: the engine tracks each player's state (available, selected,
+substitute, injured or suspended), names an eleven and four substitutes from squad order, and
+lets a manager pick the replacement when someone limps off mid-match.
+
 ```bash
 dotnet build FootballManagementEngine.Demos.slnx
 ```

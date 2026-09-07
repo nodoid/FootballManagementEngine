@@ -182,7 +182,7 @@ public class MatchSimulatorTests
     [Test]
     public void Simulate_WithZeroHighlightCount_StillReportsTheGoals()
     {
-        var options = new MatchSimulationOptions { HighlightCount = 0 };
+        var options = new MatchSimulationOptions { HighlightCount = 0, InjuryChance = 0 };
         var seed = TestData.FindSeed(_fixture, _home, _away, options, r => r.HomeGoals + r.AwayGoals > 0);
 
         var result = new MatchSimulator(seed).Simulate(_fixture, _home, _away, options: options);
@@ -248,7 +248,7 @@ public class MatchSimulatorTests
             Assert.That(seen, Is.SubsetOf(new[]
             {
                 MatchEventType.Goal, MatchEventType.Chance, MatchEventType.Save,
-                MatchEventType.Miss, MatchEventType.YellowCard
+                MatchEventType.Miss, MatchEventType.YellowCard, MatchEventType.Injury
             }));
             Assert.That(seen, Does.Contain(MatchEventType.Goal));
             Assert.That(seen, Does.Contain(MatchEventType.YellowCard));

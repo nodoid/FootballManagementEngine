@@ -14,6 +14,13 @@ public enum CompetitionType
 
 public enum Position { GK, DEF, MID, FWD }
 
+/// <summary>
+/// Where a player currently stands for the next match. Unavailability wins over selection, so a
+/// player who picks up an injury after being named in the eleven reports as injured, not selected.
+/// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
+public enum PlayerState { Available, Selected, Substitute, Injured, Suspended }
+
 /// <summary>Supported tactical shapes. The shape changes the balance of attack, midfield and defence.</summary>
 [JsonConverter(typeof(JsonStringEnumConverter))]
 public enum Formation
@@ -58,6 +65,24 @@ public sealed class Player
     public bool Injured { get; set; }
     public int InjuryWeeks { get; set; }
     public int SuspensionMatches { get; set; }
+
+    /// <summary>Whether the player is named in their club's starting eleven for the next match.</summary>
+    public bool Selected { get; set; }
+
+    /// <summary>Whether the player is named among the substitutes for the next match.</summary>
+    public bool Substitute { get; set; }
+
+    /// <summary>
+    /// The player's standing, derived from the flags above so callers never have to combine them
+    /// themselves. Read-only, and therefore rebuilt rather than restored when a save is loaded.
+    /// </summary>
+    [JsonIgnore]
+    public PlayerState State =>
+        Injured ? PlayerState.Injured
+        : SuspensionMatches > 0 ? PlayerState.Suspended
+        : Selected ? PlayerState.Selected
+        : Substitute ? PlayerState.Substitute
+        : PlayerState.Available;
 }
 
 public sealed class PlayerSeasonStats
@@ -146,12 +171,14 @@ public sealed class StandingRow
     public int Points { get; set; }
 }
 
-public enum MatchEventType { KickOff, Goal, Miss, Save, Chance, YellowCard, HalfTime, FullTime, ExtraTime, PenaltyShootout }
+public enum MatchEventType { KickOff, Goal, Miss, Save, Chance, YellowCard, HalfTime, FullTime, ExtraTime, PenaltyShootout, Injury }
 
 public sealed class MatchHighlight
 {
     [JsonPropertyName("minute")] public int Minute { get; init; }
     [JsonPropertyName("teamId")] public string? TeamId { get; init; }
+    /// <summary>The player the event is about, where one can be identified - an injury, say.</summary>
+    [JsonPropertyName("playerId")] public string? PlayerId { get; init; }
     [JsonPropertyName("type")] public MatchEventType Type { get; init; }
     [JsonPropertyName("description")] public string Description { get; init; } = "";
 }

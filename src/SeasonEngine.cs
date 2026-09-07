@@ -70,6 +70,9 @@ public sealed class SeasonEngine
             }
         }
 
+        // Players who have just recovered become selectable again.
+        _game.RefreshAllSelections();
+
         _game.State.CurrentDateUtc = _game.State.CurrentDateUtc.AddDays(7);
         _game.SaveIfConfigured();
     }

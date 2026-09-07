@@ -9,6 +9,8 @@ public sealed class MatchSimulationOptions
     /// <summary>Approximate number of highlights generated per 90 minutes.</summary>
     public int HighlightCount { get; init; } = 10;
     public int MatchMinutes { get; init; } = 90;
+    /// <summary>Chance per club, per match, that one of its starters limps off. Zero disables injuries.</summary>
+    public double InjuryChance { get; init; } = 0.12;
 }
 
 public sealed class MatchSimulator
@@ -75,6 +77,10 @@ public sealed class MatchSimulator
         AddGoalHighlights(result, usedMinutes, home, homeGoals, options.MatchMinutes);
         AddGoalHighlights(result, usedMinutes, away, awayGoals, options.MatchMinutes);
 
+        // So are injuries, which the caller needs in order to offer a substitution.
+        AddInjuryHighlight(result, usedMinutes, home, options);
+        AddInjuryHighlight(result, usedMinutes, away, options);
+
         var generic = Math.Max(0, count - result.Count);
         var types = new[] { MatchEventType.Chance, MatchEventType.Save, MatchEventType.Miss, MatchEventType.YellowCard };
         for (var i = 0; i < generic; i++)
@@ -93,6 +99,28 @@ public sealed class MatchSimulator
         }
 
         return result.OrderBy(x => x.Minute).ToList();
+    }
+
+    /// <summary>
+    /// Occasionally takes one of a club's starters out of the match. The victim is drawn from the
+    /// eleven who are actually playing, so a club is never told a substitute got hurt.
+    /// </summary>
+    private void AddInjuryHighlight(List<MatchHighlight> result, HashSet<int> used, Team team, MatchSimulationOptions options)
+    {
+        if (options.InjuryChance <= 0 || _rng.NextDouble() >= options.InjuryChance) return;
+
+        var eleven = FootballGameEngine.StartingEleven(team);
+        if (eleven.Count == 0) return;
+
+        var victim = eleven[_rng.Next(eleven.Count)];
+        result.Add(new MatchHighlight
+        {
+            Minute = UniqueMinute(1, Math.Max(1, options.MatchMinutes), used),
+            TeamId = team.Id,
+            PlayerId = victim.Id,
+            Type = MatchEventType.Injury,
+            Description = $"{victim.Name} limps off injured for {team.ShortName}."
+        });
     }
 
     private void AddGoalHighlights(List<MatchHighlight> result, HashSet<int> used, Team team, int goals, int matchMinutes)

@@ -17,6 +17,20 @@
 - Added .NET MAUI (Android/iOS/Mac Catalyst/Windows) and MonoGame (Android/iOS) demo apps under
   `demos/`, sharing a `GameSession` application layer over the engine.
 
+## Player state, substitutes and in-match injuries
+
+- Added `PlayerState` (available, selected, substitute, injured, suspended) and the
+  `Player.Selected`/`Player.Substitute` flags behind it.
+- Squad order is now team selection: `FootballGameEngine.StartingEleven` and `Substitutes`
+  are the single definition of who plays, used by the simulator, the season statistics and
+  the demos alike. Selection is refreshed whenever availability changes.
+- Players can now be injured during a match. The simulator raises an `Injury` event naming a
+  starter, and the engine turns it into a real lay-off of one to four weeks.
+- `MatchHighlight` gained a `PlayerId`, so an event can identify who it is about.
+- `MatchSimulationOptions.InjuryChance` controls how often this happens (zero disables it).
+- Every club is now seeded with two goalkeepers, so there is cover in goal and a keeper
+  available for the bench.
+
 ## Formation and match simulation update
 
 - Added configurable formations: 4-4-2, 4-3-3, 4-2-3-1, 3-5-2, 3-4-3,

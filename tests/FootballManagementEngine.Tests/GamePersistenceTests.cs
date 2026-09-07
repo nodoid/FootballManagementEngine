@@ -511,7 +511,7 @@ public class GamePersistenceTests
         var game = TestData.MakeLeagueWorld();
         var seed = 1;
         foreach (var fixture in game.State.Fixtures.ToList())
-            game.SimulateFixture(fixture.Id, new MatchSimulationOptions { HighlightCount = 3 }, seed++);
+            game.SimulateFixture(fixture.Id, new MatchSimulationOptions { HighlightCount = 3, InjuryChance = 0 }, seed++);
         persistence.Save(game, "season");
 
         var restored = persistence.Load("season");

@@ -28,6 +28,7 @@ public sealed class FootballGameEngine
         Persistence = persistence;
         AutoSave = autoSave;
         InitialisePlayerStats();
+        RefreshAllSelections();
     }
 
     public void Save(string slot = "default") =>
@@ -61,6 +62,51 @@ public sealed class FootballGameEngine
         foreach (var player in team.Players)
             if (!State.PlayerStats.ContainsKey(player.Id))
                 State.PlayerStats[player.Id] = new PlayerSeasonStats { PlayerId = player.Id, TeamId = team.Id, Season = State.Season };
+        RefreshSelection(team);
+    }
+
+    /// <summary>
+    /// The eleven who will start for a club: the first eleven available players in squad order.
+    /// Squad order is therefore team selection, and this is the single definition of it - the
+    /// simulator's ratings, the appearance statistics and the Selected flag all read from here.
+    /// </summary>
+    public static IReadOnlyList<Player> StartingEleven(Team team) =>
+        Available(team).Take(11).ToList();
+
+    /// <summary>How many substitutes a club names alongside its starting eleven.</summary>
+    public const int SubstituteCount = 4;
+
+    /// <summary>
+    /// The named substitutes: the next <see cref="SubstituteCount"/> available players after the
+    /// starting eleven. Anyone beyond them is a reserve and is not in the matchday squad.
+    /// </summary>
+    public static IReadOnlyList<Player> Substitutes(Team team) =>
+        Available(team).Skip(11).Take(SubstituteCount).ToList();
+
+    private static IEnumerable<Player> Available(Team team) =>
+        team.Players.Where(p => !p.Injured && p.SuspensionMatches == 0);
+
+    /// <summary>
+    /// Brings every player's <see cref="Player.Selected"/> flag back in line with the current
+    /// starting eleven. Called whenever availability changes, so a player who is injured out of
+    /// the side is replaced by the next available squad member straight away.
+    /// </summary>
+    public static void RefreshSelection(Team team)
+    {
+        var eleven = StartingEleven(team).ToHashSet();
+        var bench = Substitutes(team).ToHashSet();
+
+        foreach (var player in team.Players)
+        {
+            player.Selected = eleven.Contains(player);
+            player.Substitute = bench.Contains(player);
+        }
+    }
+
+    /// <summary>Refreshes selection for every club, after a load or a week of recoveries.</summary>
+    public void RefreshAllSelections()
+    {
+        foreach (var team in State.Teams.Values) RefreshSelection(team);
     }
 
     /// <summary>
@@ -102,6 +148,10 @@ public sealed class FootballGameEngine
         player.Injured = weeks > 0;
         player.InjuryWeeks = weeks;
         if (weeks > 0 && State.PlayerStats.TryGetValue(player.Id, out var stats)) stats.Injuries++;
+
+        var club = State.Teams.Values.FirstOrDefault(t => t.Players.Contains(player));
+        if (club is not null) RefreshSelection(club);
+
         AutoSaveIfEnabled();
     }
 
@@ -301,6 +351,9 @@ public sealed class FootballGameEngine
         if (result.DateUtc.HasValue)
             fixture.DateUtc = result.DateUtc.Value;
 
+        if (State.Teams.TryGetValue(fixture.HomeTeamId, out var homeTeam)) RefreshSelection(homeTeam);
+        if (State.Teams.TryGetValue(fixture.AwayTeamId, out var awayTeam)) RefreshSelection(awayTeam);
+
         AutoSaveIfEnabled();
     }
 
@@ -313,9 +366,8 @@ public sealed class FootballGameEngine
 
     private void UpdateTeamPlayerStats(Team team, int goals, IReadOnlyList<MatchHighlight> highlights, int opponentGoals)
     {
-        var available = team.Players.Where(p => !p.Injured && p.SuspensionMatches == 0).ToList();
-        if (available.Count == 0) return;
-        var starters = available.Take(Math.Min(11, available.Count)).ToList();
+        var starters = StartingEleven(team).ToList();
+        if (starters.Count == 0) return;
         foreach (var player in starters)
         {
             if (!State.PlayerStats.TryGetValue(player.Id, out var stats))
@@ -324,6 +376,8 @@ public sealed class FootballGameEngine
             // A clean sheet is conceding nothing, so it depends on the opponent's score.
             if (opponentGoals == 0) stats.CleanSheets++;
         }
+
+        ApplyMatchInjuries(team, highlights);
 
         var goalHighlights = highlights.Where(h => h.Type == MatchEventType.Goal && h.TeamId == team.Id).ToList();
         var scorers = ScorerPool(starters);
@@ -336,6 +390,23 @@ public sealed class FootballGameEngine
         {
             var player = starters[Math.Abs(card.Minute) % starters.Count];
             State.PlayerStats[player.Id].YellowCards++;
+        }
+    }
+
+    /// <summary>
+    /// Turns the match's injury events into real, lasting injuries. The lay-off is derived from
+    /// the minute rather than drawn at random, so a seeded match stays reproducible.
+    /// </summary>
+    private void ApplyMatchInjuries(Team team, IReadOnlyList<MatchHighlight> highlights)
+    {
+        foreach (var injury in highlights.Where(h => h.Type == MatchEventType.Injury && h.TeamId == team.Id))
+        {
+            var hurt = team.Players.FirstOrDefault(p => p.Id == injury.PlayerId);
+            if (hurt is null || hurt.Injured) continue;
+
+            hurt.Injured = true;
+            hurt.InjuryWeeks = 1 + Math.Abs(injury.Minute) % 4;
+            if (State.PlayerStats.TryGetValue(hurt.Id, out var stats)) stats.Injuries++;
         }
     }
 

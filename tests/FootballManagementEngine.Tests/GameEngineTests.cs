@@ -740,7 +740,10 @@ public class GameEngineApplyResultTests
                 .ToDictionary(p => p.Id, p => engine.State.PlayerStats[p.Id].Goals);
         }
 
-        Assert.That(Play(highlights), Is.EqualTo(Play(highlights)));
+        var first = Play(highlights);
+        var second = Play(highlights);
+
+        Assert.That(second, Is.EqualTo(first));
     }
 
     [Test]
@@ -1148,5 +1151,462 @@ public class GameEngineImportExportTests
         var twice = FootballGameEngine.ImportState(once.ExportState());
 
         Assert.That(twice.ExportState(), Is.EqualTo(once.ExportState()));
+    }
+}
+
+[TestFixture]
+public class PlayerStateTests
+{
+    [Test]
+    public void State_OfAFitUnselectedPlayer_IsAvailable()
+    {
+        Assert.That(TestData.MakePlayer("P1").State, Is.EqualTo(PlayerState.Available));
+    }
+
+    [Test]
+    public void State_OfASelectedPlayer_IsSelected()
+    {
+        var player = TestData.MakePlayer("P1");
+        player.Selected = true;
+
+        Assert.That(player.State, Is.EqualTo(PlayerState.Selected));
+    }
+
+    [Test]
+    public void State_OfAnInjuredPlayer_IsInjuredEvenIfStillFlaggedSelected()
+    {
+        var player = TestData.MakePlayer("P1");
+        player.Selected = true;
+        player.Injured = true;
+
+        Assert.That(player.State, Is.EqualTo(PlayerState.Injured));
+    }
+
+    [Test]
+    public void State_OfASuspendedPlayer_IsSuspended()
+    {
+        var player = TestData.MakePlayer("P1");
+        player.Selected = true;
+        player.SuspensionMatches = 2;
+
+        Assert.That(player.State, Is.EqualTo(PlayerState.Suspended));
+    }
+
+    [Test]
+    public void State_PrefersInjuryOverSuspension()
+    {
+        var player = TestData.MakePlayer("P1");
+        player.Injured = true;
+        player.SuspensionMatches = 1;
+
+        Assert.That(player.State, Is.EqualTo(PlayerState.Injured));
+    }
+
+    [Test]
+    public void StartingEleven_IsTheFirstElevenAvailablePlayersInSquadOrder()
+    {
+        var team = TestData.MakeTeam("A", squadSize: 16);
+
+        var eleven = FootballGameEngine.StartingEleven(team);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(eleven, Has.Count.EqualTo(11));
+            Assert.That(eleven.Select(p => p.Id), Is.EqualTo(team.Players.Take(11).Select(p => p.Id)));
+        });
+    }
+
+    [Test]
+    public void StartingEleven_SkipsInjuredAndSuspendedPlayers()
+    {
+        var team = TestData.MakeTeam("A", squadSize: 16);
+        team.Players[0].Injured = true;
+        team.Players[1].SuspensionMatches = 1;
+
+        var eleven = FootballGameEngine.StartingEleven(team);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(eleven, Has.Count.EqualTo(11));
+            Assert.That(eleven.Select(p => p.Id), Does.Not.Contain(team.Players[0].Id));
+            Assert.That(eleven.Select(p => p.Id), Does.Not.Contain(team.Players[1].Id));
+            Assert.That(eleven[0].Id, Is.EqualTo(team.Players[2].Id));
+        });
+    }
+
+    [Test]
+    public void StartingEleven_WithAShortSquad_ReturnsWhoeverIsLeft()
+    {
+        var team = TestData.MakeTeam("A", squadSize: 7);
+
+        Assert.That(FootballGameEngine.StartingEleven(team), Has.Count.EqualTo(7));
+    }
+
+    [Test]
+    public void AddTeam_MarksTheStartingElevenAsSelected()
+    {
+        var engine = new FootballGameEngine();
+        var team = TestData.MakeTeam("A", squadSize: 16);
+
+        engine.AddTeam(team);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(team.Players.Count(p => p.Selected), Is.EqualTo(11));
+            Assert.That(team.Players.Take(11).Select(p => p.State), Is.All.EqualTo(PlayerState.Selected));
+            Assert.That(team.Players.Skip(11).Take(4).Select(p => p.State), Is.All.EqualTo(PlayerState.Substitute));
+            Assert.That(team.Players.Skip(15).Select(p => p.State), Is.All.EqualTo(PlayerState.Available));
+        });
+    }
+
+    [Test]
+    public void SetPlayerInjury_DropsThePlayerAndPromotesTheNextAvailableOne()
+    {
+        var engine = new FootballGameEngine();
+        var team = TestData.MakeTeam("A", squadSize: 16);
+        engine.AddTeam(team);
+        var dropped = team.Players[3];
+        var promoted = team.Players[11];
+
+        engine.SetPlayerInjury(dropped.Id, 3);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(dropped.State, Is.EqualTo(PlayerState.Injured));
+            Assert.That(dropped.Selected, Is.False);
+            Assert.That(promoted.State, Is.EqualTo(PlayerState.Selected));
+            Assert.That(team.Players.Count(p => p.Selected), Is.EqualTo(11));
+        });
+    }
+
+    [Test]
+    public void ProcessWeek_ReturnsARecoveredPlayerToTheSelectedEleven()
+    {
+        var engine = TestData.MakeLeagueWorld(withFixtures: false);
+        var team = engine.State.Teams["T1"];
+        var player = team.Players[2];
+        engine.SetPlayerInjury(player.Id, 1);
+        Assume.That(player.State, Is.EqualTo(PlayerState.Injured));
+
+        new SeasonEngine(engine).ProcessWeek();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(player.Injured, Is.False);
+            Assert.That(player.State, Is.EqualTo(PlayerState.Selected));
+            Assert.That(team.Players.Count(p => p.Selected), Is.EqualTo(11));
+        });
+    }
+
+    [Test]
+    public void Selection_MatchesThePlayersCreditedWithAnAppearance()
+    {
+        var engine = TestData.MakeLeagueWorld();
+        var fixture = engine.State.Fixtures.First();
+        var home = engine.State.Teams[fixture.HomeTeamId];
+        var selected = home.Players.Where(p => p.Selected).Select(p => p.Id).ToList();
+
+        TestData.RecordResult(engine, fixture, 1, 0);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(selected, Has.Count.EqualTo(11));
+            foreach (var id in selected)
+                Assert.That(engine.State.PlayerStats[id].Appearances, Is.EqualTo(1), id);
+        });
+    }
+
+    [Test]
+    public void Selection_SurvivesASaveAndLoadRoundTrip()
+    {
+        var original = TestData.MakeLeagueWorld();
+        original.SetPlayerInjury("T1-P01", 2);
+
+        var restored = FootballGameEngine.ImportState(original.ExportState());
+        var team = restored.State.Teams["T1"];
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(team.Players.Single(p => p.Id == "T1-P01").State, Is.EqualTo(PlayerState.Injured));
+            Assert.That(team.Players.Count(p => p.Selected), Is.EqualTo(10),
+                "an eleven-strong squad with one player injured can only field ten");
+        });
+    }
+
+    [Test]
+    public void State_IsNotPersistedBecauseItIsDerived()
+    {
+        var engine = TestData.MakeLeagueWorld();
+
+        Assert.That(engine.ExportState(), Does.Not.Contain("\"state\""));
+    }
+}
+
+[TestFixture]
+public class SelectionAfterReorderTests
+{
+    [Test]
+    public void RefreshSelection_AfterTheSquadIsReordered_MarksTheNewFirstEleven()
+    {
+        // Squad order is team selection, so re-ordering a squad must be followed by a refresh,
+        // otherwise the flags still point at the players who used to be at the top.
+        var engine = new FootballGameEngine();
+        var team = TestData.MakeTeam("A", squadSize: 16);
+        engine.AddTeam(team);
+        var originalEleven = team.Players.Take(11).Select(p => p.Id).ToList();
+
+        team.Players.Reverse();
+        FootballGameEngine.RefreshSelection(team);
+
+        var selected = team.Players.Where(p => p.Selected).Select(p => p.Id).ToList();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(selected, Is.EqualTo(team.Players.Take(11).Select(p => p.Id)));
+            Assert.That(selected, Is.Not.EqualTo(originalEleven));
+            Assert.That(team.Players.Take(11).Select(p => p.State), Is.All.EqualTo(PlayerState.Selected));
+        });
+    }
+}
+
+[TestFixture]
+public class SubstituteTests
+{
+    [Test]
+    public void Substitutes_AreTheFourAvailablePlayersAfterTheEleven()
+    {
+        var team = TestData.MakeTeam("A", squadSize: 20);
+
+        var bench = FootballGameEngine.Substitutes(team);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(bench, Has.Count.EqualTo(FootballGameEngine.SubstituteCount));
+            Assert.That(bench.Select(p => p.Id), Is.EqualTo(team.Players.Skip(11).Take(4).Select(p => p.Id)));
+        });
+    }
+
+    [Test]
+    public void Substitutes_NeverOverlapTheStartingEleven()
+    {
+        var team = TestData.MakeTeam("A", squadSize: 20);
+
+        var eleven = FootballGameEngine.StartingEleven(team).Select(p => p.Id).ToList();
+        var bench = FootballGameEngine.Substitutes(team).Select(p => p.Id).ToList();
+
+        Assert.That(eleven.Intersect(bench), Is.Empty);
+    }
+
+    [Test]
+    public void Substitutes_SkipUnavailablePlayers()
+    {
+        var team = TestData.MakeTeam("A", squadSize: 20);
+        team.Players[11].Injured = true;
+        team.Players[12].SuspensionMatches = 1;
+
+        var bench = FootballGameEngine.Substitutes(team).Select(p => p.Id).ToList();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(bench, Has.Count.EqualTo(4));
+            Assert.That(bench, Does.Not.Contain(team.Players[11].Id));
+            Assert.That(bench, Does.Not.Contain(team.Players[12].Id));
+            Assert.That(bench[0], Is.EqualTo(team.Players[13].Id));
+        });
+    }
+
+    [Test]
+    public void Substitutes_WithAShortSquad_ReturnsWhoeverIsLeft()
+    {
+        var team = TestData.MakeTeam("A", squadSize: 13);
+
+        Assert.That(FootballGameEngine.Substitutes(team), Has.Count.EqualTo(2));
+    }
+
+    [Test]
+    public void Substitutes_WithNoSpareBodies_IsEmpty()
+    {
+        var team = TestData.MakeTeam("A", squadSize: 11);
+
+        Assert.That(FootballGameEngine.Substitutes(team), Is.Empty);
+    }
+
+    [Test]
+    public void RefreshSelection_NamesAMatchdaySquadOfFifteen()
+    {
+        var engine = new FootballGameEngine();
+        var team = TestData.MakeTeam("A", squadSize: 22);
+
+        engine.AddTeam(team);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(team.Players.Count(p => p.State == PlayerState.Selected), Is.EqualTo(11));
+            Assert.That(team.Players.Count(p => p.State == PlayerState.Substitute), Is.EqualTo(4));
+            Assert.That(team.Players.Count(p => p.State == PlayerState.Available), Is.EqualTo(7));
+        });
+    }
+
+    [Test]
+    public void InjuringAStarter_PromotesASubstituteAndPullsInTheNextReserve()
+    {
+        var engine = new FootballGameEngine();
+        var team = TestData.MakeTeam("A", squadSize: 22);
+        engine.AddTeam(team);
+        var starter = team.Players[5];
+        var firstSub = team.Players[11];
+        var firstReserve = team.Players[15];
+
+        engine.SetPlayerInjury(starter.Id, 2);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(starter.State, Is.EqualTo(PlayerState.Injured));
+            Assert.That(firstSub.State, Is.EqualTo(PlayerState.Selected), "the first sub steps up");
+            Assert.That(firstReserve.State, Is.EqualTo(PlayerState.Substitute), "a reserve joins the bench");
+            Assert.That(team.Players.Count(p => p.State == PlayerState.Selected), Is.EqualTo(11));
+            Assert.That(team.Players.Count(p => p.State == PlayerState.Substitute), Is.EqualTo(4));
+        });
+    }
+
+    [Test]
+    public void OnlyTheStartingEleven_AreCreditedWithAnAppearance()
+    {
+        var engine = TestData.MakeLeagueWorld();
+        var fixture = engine.State.Fixtures.First();
+        var home = engine.State.Teams[fixture.HomeTeamId];
+
+        TestData.RecordResult(engine, fixture, 1, 0);
+
+        var subs = home.Players.Where(p => p.State == PlayerState.Substitute).ToList();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(home.Players.Count(p => engine.State.PlayerStats[p.Id].Appearances == 1), Is.EqualTo(11));
+            foreach (var sub in subs)
+                Assert.That(engine.State.PlayerStats[sub.Id].Appearances, Is.Zero, sub.Id);
+        });
+    }
+}
+
+[TestFixture]
+public class MatchInjuryTests
+{
+    private static readonly MatchSimulationOptions AlwaysInjured =
+        new() { DurationSeconds = 0, HighlightCount = 6, InjuryChance = 1.0 };
+
+    private static readonly MatchSimulationOptions NeverInjured =
+        new() { DurationSeconds = 0, HighlightCount = 6, InjuryChance = 0 };
+
+    [Test]
+    public void Simulate_WithInjuriesDisabled_ProducesNoInjuryEvents()
+    {
+        var home = TestData.MakeTeam("HOM");
+        var away = TestData.MakeTeam("AWY");
+        var fixture = TestData.MakeFixture("C", "HOM", "AWY");
+
+        for (var seed = 1; seed <= 30; seed++)
+        {
+            var result = new MatchSimulator(seed).Simulate(fixture, home, away, null, NeverInjured);
+            Assert.That(result.Highlights.Any(h => h.Type == MatchEventType.Injury), Is.False, $"seed {seed}");
+        }
+    }
+
+    [Test]
+    public void Simulate_InjuryEventsNameAPlayerFromTheStartingEleven()
+    {
+        var home = TestData.MakeTeam("HOM", squadSize: 16);
+        var away = TestData.MakeTeam("AWY", squadSize: 16);
+        FootballGameEngine.RefreshSelection(home);
+        var fixture = TestData.MakeFixture("C", "HOM", "AWY");
+
+        var result = new MatchSimulator(3).Simulate(fixture, home, away, null, AlwaysInjured);
+        var injury = result.Highlights.First(h => h.Type == MatchEventType.Injury && h.TeamId == "HOM");
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(injury.PlayerId, Is.Not.Null);
+            Assert.That(FootballGameEngine.StartingEleven(home).Select(p => p.Id), Does.Contain(injury.PlayerId));
+            Assert.That(injury.Description, Does.Contain("injured"));
+            Assert.That(injury.Minute, Is.InRange(1, 90));
+        });
+    }
+
+    [Test]
+    public void SimulateFixture_AnInjuryEventPutsThePlayerOutForRealWeeks()
+    {
+        var engine = TestData.MakeLeagueWorld(teamCount: 4);
+        foreach (var team in engine.State.Teams.Values)
+            team.Players.AddRange(TestData.MakeSquad($"{team.Id}X", 8));
+        engine.RefreshAllSelections();
+
+        var fixture = engine.State.Fixtures.First();
+        var result = engine.SimulateFixture(fixture.Id, AlwaysInjured, seed: 5);
+        var injury = result.Highlights.First(h => h.Type == MatchEventType.Injury);
+        var hurt = engine.State.Teams.Values.SelectMany(t => t.Players).Single(p => p.Id == injury.PlayerId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(hurt.Injured, Is.True);
+            Assert.That(hurt.InjuryWeeks, Is.InRange(1, 4));
+            Assert.That(hurt.State, Is.EqualTo(PlayerState.Injured));
+            Assert.That(engine.State.PlayerStats[hurt.Id].Injuries, Is.EqualTo(1));
+        });
+    }
+
+    [Test]
+    public void SimulateFixture_AnInjuredStarterLosesTheirPlaceInTheEleven()
+    {
+        var engine = TestData.MakeLeagueWorld(teamCount: 4);
+        foreach (var team in engine.State.Teams.Values)
+            team.Players.AddRange(TestData.MakeSquad($"{team.Id}X", 8));
+        engine.RefreshAllSelections();
+
+        var fixture = engine.State.Fixtures.First();
+        var result = engine.SimulateFixture(fixture.Id, AlwaysInjured, seed: 5);
+        var injury = result.Highlights.First(h => h.Type == MatchEventType.Injury);
+        var club = engine.State.Teams.Values.Single(t => t.Players.Any(p => p.Id == injury.PlayerId));
+        var hurt = club.Players.Single(p => p.Id == injury.PlayerId);
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(hurt.Selected, Is.False);
+            Assert.That(club.Players.Count(p => p.Selected), Is.EqualTo(11), "a replacement steps in");
+        });
+    }
+
+    [Test]
+    public void SimulateFixture_TheInjuredPlayerStillGetsTheirAppearance()
+    {
+        var engine = TestData.MakeLeagueWorld(teamCount: 4);
+        foreach (var team in engine.State.Teams.Values)
+            team.Players.AddRange(TestData.MakeSquad($"{team.Id}X", 8));
+        engine.RefreshAllSelections();
+
+        var fixture = engine.State.Fixtures.First();
+        var result = engine.SimulateFixture(fixture.Id, AlwaysInjured, seed: 5);
+        var injury = result.Highlights.First(h => h.Type == MatchEventType.Injury);
+
+        Assert.That(engine.State.PlayerStats[injury.PlayerId!].Appearances, Is.EqualTo(1),
+            "they started the match, so the appearance counts");
+    }
+
+    [Test]
+    public void SimulateFixture_IsStillReproducibleWithInjuriesOn()
+    {
+        Dictionary<string, int> Play()
+        {
+            var engine = TestData.MakeLeagueWorld(teamCount: 4);
+            var fixture = engine.State.Fixtures.First();
+            engine.SimulateFixture(fixture.Id, AlwaysInjured, seed: 99);
+            return engine.State.Teams.Values
+                .SelectMany(t => t.Players)
+                .ToDictionary(p => p.Id, p => p.InjuryWeeks);
+        }
+
+        var first = Play();
+        var second = Play();
+
+        Assert.That(second, Is.EqualTo(first));
     }
 }

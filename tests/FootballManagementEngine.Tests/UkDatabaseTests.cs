@@ -135,11 +135,15 @@ public class UkDatabaseTests
 
         Assert.Multiple(() =>
         {
-            Assert.That(squad.Count(p => p.Position == Position.GK), Is.EqualTo(1));
+            Assert.That(squad.Count(p => p.Position == Position.GK), Is.EqualTo(2),
+                "a club needs a second keeper for cover and for the bench");
             Assert.That(squad.Count(p => p.Position == Position.DEF), Is.EqualTo(7));
             Assert.That(squad.Count(p => p.Position == Position.MID), Is.EqualTo(8));
-            Assert.That(squad.Count(p => p.Position == Position.FWD), Is.EqualTo(6));
-            Assert.That(squad[0].Goalkeeping, Is.GreaterThan(squad[1].Goalkeeping));
+            Assert.That(squad.Count(p => p.Position == Position.FWD), Is.EqualTo(5));
+            Assert.That(squad.Where(p => p.Position == Position.GK).Select(p => p.Goalkeeping),
+                Is.All.GreaterThan(50));
+            Assert.That(squad.Where(p => p.Position != Position.GK).Select(p => p.Goalkeeping),
+                Is.All.LessThan(50));
         });
     }
 

@@ -5,8 +5,8 @@ namespace FootballManagementEngine.Maui.Pages;
 
 /// <summary>A squad member as the list draws them.</summary>
 public sealed record PlayerRow(
-    string Position, string Name, string Status, int Overall, int Age,
-    int Appearances, int Goals, Color PositionColour, Color StatusColour);
+    string Position, string Name, string Status, string Badge, int Overall, int Age,
+    int Appearances, int Goals, Color PositionColour, Color StatusColour, Color BadgeColour);
 
 public partial class SquadPage : ContentPage
 {
@@ -44,12 +44,14 @@ public partial class SquadPage : ContentPage
                 player.Position.ToString(),
                 player.Name,
                 Status(player),
+                player.Badge,
                 player.Overall,
                 player.Age,
                 player.Appearances,
                 player.Goals,
                 PositionColour(player.Position),
-                player.Injured ? Color.FromArgb("#B3261E") : Colors.Gray));
+                player.Injured ? Color.FromArgb("#B3261E") : Colors.Gray,
+                BadgeColour(player.State)));
         }
     }
 
@@ -57,6 +59,15 @@ public partial class SquadPage : ContentPage
         player.Injured
             ? $"Injured · {player.InjuryWeeks} week{(player.InjuryWeeks == 1 ? "" : "s")} out"
             : $"{player.WeeklyWage:C0}/week";
+
+    private static Color BadgeColour(PlayerState state) => state switch
+    {
+        PlayerState.Selected => Color.FromArgb("#2F7D32"),
+        PlayerState.Substitute => Color.FromArgb("#2F6FB3"),
+        PlayerState.Injured => Color.FromArgb("#B3261E"),
+        PlayerState.Suspended => Color.FromArgb("#C77700"),
+        _ => Colors.Gray
+    };
 
     private static Color PositionColour(Position position) => position switch
     {

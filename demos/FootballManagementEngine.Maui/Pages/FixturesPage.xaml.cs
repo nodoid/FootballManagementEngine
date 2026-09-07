@@ -100,16 +100,56 @@ public partial class FixturesPage : ContentPage
 
             ResultVerdictLabel.Text = forGoals > againstGoals ? "Win" : forGoals < againstGoals ? "Defeat" : "Draw";
 
+            var injuries = _session.InjuriesIn(result).ToList();
+
             foreach (var highlight in result.Highlights.OrderBy(h => h.Minute))
             {
                 _highlights.Add(new HighlightRow($"{highlight.Minute}'", highlight.Description));
                 await Task.Delay(120);
+
+                // The commentary stops on the minute of an injury so the replacement is chosen
+                // there and then, and only afterwards does the match play out to full time.
+                var injury = injuries.FirstOrDefault(i => i.Player.PlayerId == highlight.PlayerId);
+                if (injury is not null)
+                {
+                    injuries.Remove(injury);
+                    await OfferSubstitution(injury);
+                }
             }
         }
 
         PlayButton.IsEnabled = true;
         PlayButton.Text = "Play match";
         Refresh();
+    }
+
+    /// <summary>
+    /// Stops the match on the minute a player limps off and asks the manager who comes on,
+    /// rather than promoting the next player in the squad list silently.
+    /// </summary>
+    private async Task OfferSubstitution(MatchInjury injury)
+    {
+        var player = injury.Player;
+        var bench = _session.Bench;
+
+        if (bench.Count == 0)
+        {
+            await DisplayAlertAsync(
+                $"{injury.Minute}' Injury",
+                $"{player.Name} is out for {player.InjuryWeeks} week(s), and there is nobody on the bench.",
+                "Play on");
+            return;
+        }
+
+        var options = bench.Select(p => $"{p.Position} · {p.Name} ({p.Overall})").ToArray();
+        var choice = await DisplayActionSheetAsync(
+            $"{injury.Minute}' — {player.Name} is injured ({player.InjuryWeeks} week(s)). Bring on:",
+            "Play on",
+            null,
+            options);
+
+        var index = Array.IndexOf(options, choice);
+        if (index >= 0) _session.MakeSubstitution(player.PlayerId, bench[index].PlayerId);
     }
 
     private static Color ResultColour(FixtureCard fixture, string teamId)

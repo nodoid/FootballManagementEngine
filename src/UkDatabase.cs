@@ -86,7 +86,8 @@ public static class UkDatabase
                 {
                     Id = $"{id}-P{p + 1:00}",
                     Name = names[(p + id.Length) % names.Length],
-                    Position = p switch { 0 => Position.GK, < 8 => Position.DEF, < 16 => Position.MID, _ => Position.FWD },
+                    // Two keepers, so a club always has cover in goal and can name one on the bench.
+                    Position = p switch { < 2 => Position.GK, < 9 => Position.DEF, < 17 => Position.MID, _ => Position.FWD },
                     Age = 18 + ((p * 3 + id.Length) % 18),
                     Overall = overall,
                     Potential = Math.Min(95, overall + 3 + (p % 12)),
@@ -94,7 +95,7 @@ public static class UkDatabase
                     Shooting = 45 + (p * 5) % 50,
                     Passing = 45 + (p * 7) % 50,
                     Defending = 45 + (p * 11) % 50,
-                    Goalkeeping = p == 0 ? 60 + (p * 4) % 35 : 10,
+                    Goalkeeping = p < 2 ? 60 + (p * 4) % 35 : 10,
                     WeeklyWage = 800 + overall * 90,
                     ContractClubId = id,
                     ContractYears = 1 + p % 4

@@ -181,7 +181,7 @@ public class GameFlowIntegrationTests
         var seed = 1;
 
         foreach (var fixture in game.State.Fixtures.ToList())
-            game.SimulateFixture(fixture.Id, new MatchSimulationOptions { HighlightCount = 4 }, seed++);
+            game.SimulateFixture(fixture.Id, new MatchSimulationOptions { HighlightCount = 4, InjuryChance = 0 }, seed++);
 
         var stats = game.State.PlayerStats.Values.ToList();
 

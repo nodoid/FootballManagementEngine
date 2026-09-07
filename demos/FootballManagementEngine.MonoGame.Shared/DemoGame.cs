@@ -39,6 +39,9 @@ public sealed class DemoGame : Game
 
     private float _splashSeconds;
 
+    private readonly List<MatchInjury> _pendingInjuries = [];
+    private MatchInjury? _awaitingSubstitution;
+
     private MatchResult? _match;
     private FixtureCard? _matchFixture;
     private bool _matchWasHome;
@@ -99,10 +102,18 @@ public sealed class DemoGame : Game
             if (_session is not null && _splashSeconds >= MinimumSplashSeconds)
                 _screen = _session.Club is null ? Screen.ClubSelect : Screen.Hub;
         }
-        else if (_screen == Screen.Match)
+        else if (_screen == Screen.Match && _awaitingSubstitution is null)
         {
             // 90 minutes in roughly seven seconds, then hold on the final score.
             _matchClock = Math.Min(96f, _matchClock + elapsed * 14f);
+
+            // The clock stops the moment someone limps off, and only restarts once the
+            // manager has named a replacement.
+            if (_pendingInjuries.Count > 0 && _pendingInjuries[0].Minute <= (int)_matchClock)
+            {
+                _awaitingSubstitution = _pendingInjuries[0];
+                _pendingInjuries.RemoveAt(0);
+            }
         }
 
         base.Update(gameTime);
@@ -288,12 +299,6 @@ public sealed class DemoGame : Game
     {
         if (_session is null) return;
 
-        _ui.Fill(_batch, new Rectangle(0, viewport.Y, Ui.CanvasWidth, 16), Palette.PanelAlt);
-        _ui.Text(_batch, "CLUB", 34, viewport.Y + 5, Palette.TextDim);
-        _ui.TextRight(_batch, "P", 250, viewport.Y + 5, Palette.TextDim);
-        _ui.TextRight(_batch, "GD", 300, viewport.Y + 5, Palette.TextDim);
-        _ui.TextRight(_batch, "PTS", 350, viewport.Y + 5, Palette.TextDim);
-
         var rows = _session.Table;
         var list = new Rectangle(viewport.X, viewport.Y + 16, viewport.Width, viewport.Height - 16);
         _listScroll.Update(_ui, list.Height, rows.Count * 22, elapsed);
@@ -316,17 +321,20 @@ public sealed class DemoGame : Game
             }
             y += 22;
         }
+
+        // Drawn last so a scrolled row cannot paint over it.
+        _ui.Fill(_batch, new Rectangle(0, viewport.Y, Ui.CanvasWidth, 16), Palette.PanelAlt);
+        _ui.Text(_batch, "CLUB", 34, viewport.Y + 5, Palette.TextDim);
+        _ui.TextRight(_batch, "P", 250, viewport.Y + 5, Palette.TextDim);
+        _ui.TextRight(_batch, "GD", 300, viewport.Y + 5, Palette.TextDim);
+        _ui.TextRight(_batch, "PTS", 350, viewport.Y + 5, Palette.TextDim);
     }
 
     private void DrawSquad(Rectangle viewport, float elapsed)
     {
         if (_session is null) return;
 
-        _ui.Fill(_batch, new Rectangle(0, viewport.Y, Ui.CanvasWidth, 16), Palette.PanelAlt);
-        _ui.Text(_batch, "PLAYER", 46, viewport.Y + 5, Palette.TextDim);
-        _ui.TextRight(_batch, "OVR", 268, viewport.Y + 5, Palette.TextDim);
-        _ui.TextRight(_batch, "APP", 310, viewport.Y + 5, Palette.TextDim);
-        _ui.TextRight(_batch, "GLS", 350, viewport.Y + 5, Palette.TextDim);
+        const int stateColumn = 232;
 
         var squad = _session.Squad;
         var list = new Rectangle(viewport.X, viewport.Y + 16, viewport.Width, viewport.Height - 16);
@@ -337,16 +345,25 @@ public sealed class DemoGame : Game
         {
             if (y + 22 > list.Y && y < list.Bottom)
             {
-                _ui.Text(_batch, player.Position.ToString(), 10, y + 7, PositionColour(player.Position));
-                _ui.Text(_batch, _font.Fit(player.Name.ToUpperInvariant(), 200), 46, y + 7,
+                _ui.Text(_batch, player.Position.ToString(), 8, y + 7, PositionColour(player.Position));
+                _ui.Text(_batch, _font.Fit(player.Name.ToUpperInvariant(), 176), 40, y + 7,
                     player.Injured ? Palette.Loss : Palette.Text);
-                _ui.TextRight(_batch, $"{player.Overall}", 268, y + 7, Palette.TextDim);
-                _ui.TextRight(_batch, $"{player.Appearances}", 310, y + 7, Palette.TextDim);
-                _ui.TextRight(_batch, $"{player.Goals}", 350, y + 7,
+                _ui.TextCentred(_batch, player.Badge, stateColumn, y + 7, StateColour(player.State));
+                _ui.TextRight(_batch, $"{player.Overall}", 280, y + 7, Palette.TextDim);
+                _ui.TextRight(_batch, $"{player.Appearances}", 318, y + 7, Palette.TextDim);
+                _ui.TextRight(_batch, $"{player.Goals}", 352, y + 7,
                     player.Goals > 0 ? Palette.Highlight : Palette.TextDim);
             }
             y += 22;
         }
+
+        // Drawn last so a scrolled row cannot paint over it.
+        _ui.Fill(_batch, new Rectangle(0, viewport.Y, Ui.CanvasWidth, 16), Palette.PanelAlt);
+        _ui.Text(_batch, "PLAYER", 40, viewport.Y + 5, Palette.TextDim);
+        _ui.TextCentred(_batch, "STATE", stateColumn, viewport.Y + 5, Palette.TextDim);
+        _ui.TextRight(_batch, "OVR", 280, viewport.Y + 5, Palette.TextDim);
+        _ui.TextRight(_batch, "APP", 318, viewport.Y + 5, Palette.TextDim);
+        _ui.TextRight(_batch, "GLS", 352, viewport.Y + 5, Palette.TextDim);
     }
 
     private void DrawMatch()
@@ -393,6 +410,12 @@ public sealed class DemoGame : Game
             y += 22;
         }
 
+        if (_awaitingSubstitution is { } awaiting)
+        {
+            DrawSubstitutionOverlay(awaiting);
+            return;
+        }
+
         if (finished)
         {
             var verdict = _matchWasHome
@@ -417,6 +440,55 @@ public sealed class DemoGame : Game
         }
     }
 
+    /// <summary>
+    /// Drawn over the paused match when a player limps off: the clock is stopped on the minute,
+    /// the bench is offered, and play resumes to full time once a choice is made.
+    /// </summary>
+    private void DrawSubstitutionOverlay(MatchInjury injury)
+    {
+        if (_session is null) return;
+
+        var panel = new Rectangle(0, 130, Ui.CanvasWidth, Ui.CanvasHeight - 130);
+        _ui.Fill(_batch, panel, Palette.Background);
+        _ui.Fill(_batch, new Rectangle(0, 130, Ui.CanvasWidth, 2), Palette.Loss);
+
+        _ui.TextCentred(_batch, $"{injury.Minute}' INJURY", Ui.CanvasWidth / 2, 146, Palette.Loss, 2);
+        _ui.TextCentred(_batch,
+            $"{injury.Player.Position} {_font.Fit(injury.Player.Name.ToUpperInvariant(), 240)}",
+            Ui.CanvasWidth / 2, 172, Palette.Text);
+        _ui.TextCentred(_batch,
+            $"OUT FOR {injury.Player.InjuryWeeks} WEEK{(injury.Player.InjuryWeeks == 1 ? "" : "S")}",
+            Ui.CanvasWidth / 2, 186, Palette.TextDim);
+        _ui.TextCentred(_batch, "BRING ON", Ui.CanvasWidth / 2, 210, Palette.Accent);
+
+        var bench = _session.Bench;
+        var y = 232;
+
+        foreach (var player in bench)
+        {
+            var row = new Rectangle(8, y, Ui.CanvasWidth - 16, 34);
+            _ui.Panel(_batch, row, Palette.PanelAlt);
+            _ui.Text(_batch, player.Position.ToString(), row.X + 10, y + 13, PositionColour(player.Position));
+            _ui.Text(_batch, _font.Fit(player.Name.ToUpperInvariant(), 190), row.X + 48, y + 13, Palette.Text);
+            _ui.TextRight(_batch, $"{player.Overall}", row.Right - 10, y + 13, Palette.TextDim);
+
+            if (_ui.Tapped(row))
+            {
+                _session.MakeSubstitution(injury.Player.PlayerId, player.PlayerId);
+                _awaitingSubstitution = null;
+                return;
+            }
+
+            y += 40;
+        }
+
+        if (bench.Count == 0)
+            _ui.TextCentred(_batch, "NO SUBSTITUTES AVAILABLE", Ui.CanvasWidth / 2, 240, Palette.TextDim);
+
+        var carryOn = new Rectangle(8, Ui.CanvasHeight - 44, Ui.CanvasWidth - 16, 32);
+        if (_ui.Button(_batch, carryOn, "PLAY ON")) _awaitingSubstitution = null;
+    }
+
     // ---------- helpers ----------
 
     private void StartMatch()
@@ -432,6 +504,10 @@ public sealed class DemoGame : Game
             IncludeHighlights = true,
             HighlightCount = 12
         });
+
+        _pendingInjuries.Clear();
+        _pendingInjuries.AddRange(_session.InjuriesIn(_match));
+        _awaitingSubstitution = null;
 
         if (_match is not null) _screen = Screen.Match;
     }
@@ -463,6 +539,15 @@ public sealed class DemoGame : Game
         forGoals > againstGoals ? ("WIN", Palette.Win)
         : forGoals < againstGoals ? ("DEFEAT", Palette.Loss)
         : ("DRAW", Palette.Draw);
+
+    private static Color StateColour(PlayerState state) => state switch
+    {
+        PlayerState.Selected => Palette.Win,
+        PlayerState.Substitute => Palette.Accent,
+        PlayerState.Injured => Palette.Loss,
+        PlayerState.Suspended => Palette.Draw,
+        _ => Palette.TextDim
+    };
 
     private static Color PositionColour(Position position) => position switch
     {

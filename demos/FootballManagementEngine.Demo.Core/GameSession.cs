@@ -5,6 +5,7 @@ public sealed record SquadMember(
     string PlayerId,
     string Name,
     Position Position,
+    PlayerState State,
     int Age,
     int Overall,
     decimal WeeklyWage,
@@ -12,7 +13,21 @@ public sealed record SquadMember(
     int InjuryWeeks,
     int Appearances,
     int Goals,
-    int CleanSheets);
+    int CleanSheets)
+{
+    /// <summary>The one-character badge for the squad list's State column.</summary>
+    public string Badge => State switch
+    {
+        PlayerState.Selected => "\u2713",
+        PlayerState.Substitute => "S",
+        PlayerState.Injured => "I",
+        PlayerState.Suspended => "X",
+        _ => ""
+    };
+}
+
+/// <summary>A player who limped off, and the minute it happened.</summary>
+public sealed record MatchInjury(SquadMember Player, int Minute);
 
 /// <summary>A fixture with both club names resolved, ready to put on screen.</summary>
 public sealed record FixtureCard(
@@ -74,7 +89,12 @@ public sealed class GameSession
         // A brand new world has no calendar yet; a resumed save must never be regenerated.
         if (game.State.Fixtures.Count == 0)
         {
-            foreach (var team in game.State.Teams.Values) PickBestEleven(team);
+            foreach (var team in game.State.Teams.Values) PickMatchdaySquad(team);
+
+            // Squad order is team selection, so re-picking the eleven after re-ordering is what
+            // makes the Selected flags point at the players who will actually start.
+            game.RefreshAllSelections();
+
             session._season.GenerateDomesticSeason();
             session._season.GenerateFaCup();
 
@@ -90,32 +110,54 @@ public sealed class GameSession
     }
 
     /// <summary>
-    /// The engine fields the first eleven available players in squad order, so squad order *is*
-    /// team selection. Sorting each club into a 4-4-2 of its best available players turns that
-    /// into a sensible line-up instead of the seed data's goalkeeper-and-seven-defenders.
+    /// The engine fields the first eleven available players in squad order and names the next
+    /// four as substitutes, so squad order *is* team selection. This lays a club out as a 4-4-2
+    /// followed by a bench that covers every position, rather than the seed data's order, which
+    /// would field a goalkeeper and seven defenders and bench four defenders.
     /// </summary>
-    private static void PickBestEleven(Team team)
+    private static void PickMatchdaySquad(Team team)
     {
         var byPosition = team.Players
             .GroupBy(p => p.Position)
-            .ToDictionary(g => g.Key, g => g.OrderByDescending(p => p.Overall).ToList());
+            .ToDictionary(g => g.Key, g => new Queue<Player>(g.OrderByDescending(p => p.Overall)));
 
-        var eleven = new List<Player>();
+        Player? Best(Position position) =>
+            byPosition.TryGetValue(position, out var queue) && queue.Count > 0 ? queue.Dequeue() : null;
+
+        var ordered = new List<Player>();
+
+        // The starting eleven, as a 4-4-2.
         foreach (var (position, count) in new[]
                  {
                      (Position.GK, 1), (Position.DEF, 4), (Position.MID, 4), (Position.FWD, 2)
                  })
         {
-            if (byPosition.TryGetValue(position, out var players))
-                eleven.AddRange(players.Take(count));
+            for (var i = 0; i < count; i++)
+                if (Best(position) is { } player) ordered.Add(player);
         }
 
-        var bench = team.Players
-            .Except(eleven)
-            .OrderBy(p => p.Position)
-            .ThenByDescending(p => p.Overall);
+        // The bench: cover for each position first, so a manager can replace anyone, then the
+        // best of whoever is left if a position has nobody spare.
+        var bench = new List<Player>();
+        foreach (var position in new[] { Position.GK, Position.DEF, Position.MID, Position.FWD })
+            if (Best(position) is { } player) bench.Add(player);
 
-        var ordered = eleven.Concat(bench).ToList();
+        while (bench.Count < FootballGameEngine.SubstituteCount)
+        {
+            var next = byPosition.Values
+                .Where(q => q.Count > 0)
+                .Select(q => q.Peek())
+                .OrderByDescending(p => p.Overall)
+                .FirstOrDefault();
+
+            if (next is null) break;
+            byPosition[next.Position].Dequeue();
+            bench.Add(next);
+        }
+
+        ordered.AddRange(bench);
+        ordered.AddRange(team.Players.Except(ordered).OrderBy(p => p.Position).ThenByDescending(p => p.Overall));
+
         team.Players.Clear();
         team.Players.AddRange(ordered);
     }
@@ -166,19 +208,24 @@ public sealed class GameSession
             ? Game.Fixtures(teamId: club.Id).Where(f => f.IsPlayed).TakeLast(count).Select(ToCard).ToList()
             : [];
 
+    /// <summary>
+    /// The squad in team-selection order - the starting eleven first, then the bench - with
+    /// injured players pushed to the bottom, since they cannot be picked at all.
+    /// </summary>
     public IReadOnlyList<SquadMember> Squad =>
         Club is { } club
             ? club.Players
-                .Select(p =>
+                .Select((p, order) =>
                 {
                     Game.State.PlayerStats.TryGetValue(p.Id, out var stats);
-                    return new SquadMember(
-                        p.Id, p.Name, p.Position, p.Age, p.Overall, p.WeeklyWage,
+                    return (Order: order, Member: new SquadMember(
+                        p.Id, p.Name, p.Position, p.State, p.Age, p.Overall, p.WeeklyWage,
                         p.Injured, p.InjuryWeeks,
-                        stats?.Appearances ?? 0, stats?.Goals ?? 0, stats?.CleanSheets ?? 0);
+                        stats?.Appearances ?? 0, stats?.Goals ?? 0, stats?.CleanSheets ?? 0));
                 })
-                .OrderBy(p => p.Position)
-                .ThenByDescending(p => p.Overall)
+                .OrderBy(x => x.Member.Injured ? 1 : 0)
+                .ThenBy(x => x.Order)
+                .Select(x => x.Member)
                 .ToList()
             : [];
 
@@ -208,6 +255,53 @@ public sealed class GameSession
         Game.State.CurrentDateUtc = next.DateUtc;
         Game.SaveIfConfigured();
         return result;
+    }
+
+    /// <summary>The four named substitutes, in bench order.</summary>
+    public IReadOnlyList<SquadMember> Bench =>
+        Squad.Where(p => p.State == PlayerState.Substitute).ToList();
+
+    /// <summary>
+    /// The managed club's injuries from a match, each with the minute it happened, oldest first.
+    /// The apps stop the clock on the minute and offer the bench, rather than promoting whoever
+    /// happens to be next in the squad list.
+    /// </summary>
+    public IReadOnlyList<MatchInjury> InjuriesIn(MatchResult? result)
+    {
+        if (result is null || Club is not { } club) return [];
+
+        var squad = Squad;
+        return result.Highlights
+            .Where(h => h.Type == MatchEventType.Injury && h.TeamId == club.Id && h.PlayerId is not null)
+            .OrderBy(h => h.Minute)
+            .Select(h => (Highlight: h, Player: squad.FirstOrDefault(p => p.PlayerId == h.PlayerId)))
+            .Where(x => x.Player is not null)
+            .Select(x => new MatchInjury(x.Player!, x.Highlight.Minute))
+            .ToList();
+    }
+
+    /// <summary>
+    /// Brings a substitute on for an injured player. Squad order is team selection, so the
+    /// substitute simply takes the injured player's place in the list; the engine then re-reads
+    /// the eleven. Returns false if either player is not eligible.
+    /// </summary>
+    public bool MakeSubstitution(string injuredPlayerId, string substitutePlayerId)
+    {
+        if (Club is not { } club) return false;
+
+        var injured = club.Players.FirstOrDefault(p => p.Id == injuredPlayerId);
+        var substitute = club.Players.FirstOrDefault(p => p.Id == substitutePlayerId);
+
+        if (injured is null || substitute is null) return false;
+        if (!injured.Injured || substitute.Injured || substitute.SuspensionMatches > 0) return false;
+
+        var slot = club.Players.IndexOf(injured);
+        club.Players.Remove(substitute);
+        club.Players.Insert(slot, substitute);
+
+        FootballGameEngine.RefreshSelection(club);
+        Game.SaveIfConfigured();
+        return true;
     }
 
     /// <summary>Moves the calendar on a week, paying wages and healing injuries.</summary>
