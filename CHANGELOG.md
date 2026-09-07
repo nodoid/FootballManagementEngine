@@ -14,7 +14,7 @@
   snapshotted before any club moves.
 - Balanced the promotion and relegation places so divisions keep their size across seasons
   (League One now promotes 3, the National League 2).
-- Added .NET MAUI (Android/iOS/Mac Catalyst) and MonoGame (Android/iOS) demo apps under
+- Added .NET MAUI (Android/iOS/Mac Catalyst/Windows) and MonoGame (Android/iOS) demo apps under
   `demos/`, sharing a `GameSession` application layer over the engine.
 
 ## Formation and match simulation update

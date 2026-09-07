@@ -313,7 +313,7 @@ dotnet test FootballManagementEngine.slnx
 Two mobile front ends over the same engine live in `demos/`, in their own solution so the
 main build stays fast:
 
-- **.NET MAUI** (`Android`, `iOS`, `Mac Catalyst`) - tabbed app: club picker, fixtures with
+- **.NET MAUI** (`Android`, `iOS`, `Mac Catalyst`, `Windows`) - tabbed app: club picker, fixtures with
   live match commentary, league table and squad.
 - **MonoGame** (`Android`, `iOS`) - a touch-driven game rendering the same season, with a
   match screen that replays the engine's highlights against a running clock.

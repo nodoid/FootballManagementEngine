@@ -9,7 +9,7 @@ league table move.
 | Project | Target | What it is |
 | --- | --- | --- |
 | `FootballManagementEngine.Demo.Core` | `net10.0` | The engine compiled as a library, plus `GameSession` — the app logic both front ends drive |
-| `FootballManagementEngine.Maui` | android, ios, maccatalyst | Tabbed MAUI app: Club, Fixtures, Table, Squad |
+| `FootballManagementEngine.Maui` | android, ios, maccatalyst, windows | Tabbed MAUI app: Club, Fixtures, Table, Squad |
 | `FootballManagementEngine.MonoGame.Shared` | shared source | The MonoGame screens, bitmap font and touch UI |
 | `FootballManagementEngine.MonoGame.Android` | `net10.0-android` | MonoGame Android head |
 | `FootballManagementEngine.MonoGame.iOS` | `net10.0-ios` | MonoGame iOS head |
@@ -36,6 +36,10 @@ its own library, delete `Demo.Core` and reference that instead.
 dotnet build demos/FootballManagementEngine.Maui/FootballManagementEngine.Maui.csproj \
   -f net10.0-maccatalyst -t:Run
 
+# MAUI on Windows (run this on Windows; the target is not offered on macOS or Linux)
+dotnet build demos/FootballManagementEngine.Maui/FootballManagementEngine.Maui.csproj \
+  -f net10.0-windows10.0.19041.0 -t:Run
+
 # MAUI on a connected Android device or running emulator
 dotnet build demos/FootballManagementEngine.Maui/FootballManagementEngine.Maui.csproj \
   -f net10.0-android -t:Run
@@ -49,6 +53,11 @@ dotnet build demos/FootballManagementEngine.MonoGame.iOS/FootballManagementEngin
 ```
 
 iOS device builds need a provisioning profile and signing identity; the simulator does not.
+
+The Windows target is added only when the build is running on Windows, which is what the
+`IsOSPlatform('windows')` condition in the csproj guards - WinUI tooling cannot produce a
+Windows app from macOS or Linux. It is packaged as an unpackaged app (`WindowsPackageType`
+is `None`), so it runs with a plain `-t:Run` and needs no signing or Store identity.
 
 ## What the demos do
 
