@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="FootballManagementEngine.Maui.Pages.ClubPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Club">
+
+    <ScrollView>
+        <VerticalStackLayout Padding="20" Spacing="16">
+
+            <!-- Shown once a club is being managed. -->
+            <Border x:Name="ClubCard" IsVisible="False" Padding="18" StrokeThickness="0"
+                    BackgroundColor="{AppThemeBinding Light=#12305B, Dark=#12305B}">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="14" />
+                </Border.StrokeShape>
+                <VerticalStackLayout Spacing="6">
+                    <Label x:Name="ClubNameLabel" FontSize="26" FontAttributes="Bold" TextColor="White" />
+                    <Label x:Name="ClubLeagueLabel" FontSize="15" TextColor="#9FC4F0" />
+                    <Label x:Name="ClubPositionLabel" FontSize="15" TextColor="#9FC4F0" />
+                    <Label x:Name="ClubDateLabel" FontSize="13" TextColor="#7FA6D4" Margin="0,6,0,0" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Grid x:Name="ActionRow" IsVisible="False" ColumnDefinitions="*,*" ColumnSpacing="10">
+                <Button Grid.Column="0" x:Name="AdvanceButton" Text="Advance a week" Clicked="OnAdvanceWeek" />
+                <Button Grid.Column="1" Text="Change club" Clicked="OnChangeClub"
+                        BackgroundColor="#5B6570" />
+            </Grid>
+
+            <VerticalStackLayout x:Name="FormationRow" IsVisible="False" Spacing="6">
+                <Label Text="Formation" FontAttributes="Bold" />
+                <Picker x:Name="FormationPicker" SelectedIndexChanged="OnFormationChanged" />
+            </VerticalStackLayout>
+
+            <Label x:Name="PickerPrompt" Text="Choose a club to manage"
+                   FontSize="20" FontAttributes="Bold" />
+            <Label Text="Every club in the English pyramid is playable. Tap one to take charge."
+                   FontSize="13" TextColor="Gray" />
+
+            <SearchBar x:Name="ClubSearch" Placeholder="Search clubs" TextChanged="OnSearchChanged" />
+
+            <CollectionView x:Name="ClubList" SelectionMode="Single" SelectionChanged="OnClubSelected"
+                            IsGrouped="True" HeightRequest="440">
+                <CollectionView.GroupHeaderTemplate>
+                    <DataTemplate>
+                        <Label Text="{Binding Name}" FontAttributes="Bold" FontSize="14"
+                               BackgroundColor="{AppThemeBinding Light=#ECEFF3, Dark=#2A2E33}"
+                               Padding="12,8" />
+                    </DataTemplate>
+                </CollectionView.GroupHeaderTemplate>
+                <CollectionView.ItemTemplate>
+                    <DataTemplate>
+                        <Grid Padding="12,10" ColumnDefinitions="Auto,*,Auto" ColumnSpacing="12">
+                            <Label Grid.Column="0" Text="{Binding ShortName}" FontAttributes="Bold"
+                                   WidthRequest="52" VerticalOptions="Center" />
+                            <Label Grid.Column="1" Text="{Binding Name}" VerticalOptions="Center" />
+                            <Label Grid.Column="2" Text="{Binding Reputation, StringFormat='rep {0}'}"
+                                   FontSize="12" TextColor="Gray" VerticalOptions="Center" />
+                        </Grid>
+                    </DataTemplate>
+                </CollectionView.ItemTemplate>
+            </CollectionView>
+
+        </VerticalStackLayout>
+    </ScrollView>
+
+</ContentPage>

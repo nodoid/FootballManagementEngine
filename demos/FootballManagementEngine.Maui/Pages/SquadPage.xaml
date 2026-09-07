@@ -1,0 +1,51 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="FootballManagementEngine.Maui.Pages.SquadPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Squad">
+
+    <Grid RowDefinitions="Auto,*" Padding="12">
+
+        <VerticalStackLayout Grid.Row="0" Padding="4,8" Spacing="2">
+            <Label x:Name="SquadHeader" FontSize="18" FontAttributes="Bold" />
+            <Label x:Name="WageLabel" FontSize="12" TextColor="Gray" />
+        </VerticalStackLayout>
+
+        <CollectionView Grid.Row="1" x:Name="SquadList">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Grid ColumnDefinitions="40,*,34,34,34,34" ColumnSpacing="4" Padding="4,10">
+                        <Label Grid.Column="0" Text="{Binding Position}" FontSize="11" FontAttributes="Bold"
+                               TextColor="{Binding PositionColour}" VerticalOptions="Center" />
+                        <VerticalStackLayout Grid.Column="1" Spacing="1" VerticalOptions="Center">
+                            <Label Text="{Binding Name}" FontSize="14" LineBreakMode="TailTruncation" />
+                            <Label Text="{Binding Status}" FontSize="11" TextColor="{Binding StatusColour}" />
+                        </VerticalStackLayout>
+                        <Label Grid.Column="2" Text="{Binding Overall}" FontSize="13" FontAttributes="Bold"
+                               HorizontalTextAlignment="Center" VerticalOptions="Center" />
+                        <Label Grid.Column="3" Text="{Binding Age}" FontSize="12" HorizontalTextAlignment="Center"
+                               TextColor="Gray" VerticalOptions="Center" />
+                        <Label Grid.Column="4" Text="{Binding Appearances}" FontSize="12"
+                               HorizontalTextAlignment="Center" TextColor="Gray" VerticalOptions="Center" />
+                        <Label Grid.Column="5" Text="{Binding Goals}" FontSize="12" HorizontalTextAlignment="Center"
+                               TextColor="Gray" VerticalOptions="Center" />
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+            <CollectionView.Header>
+                <Grid ColumnDefinitions="40,*,34,34,34,34" ColumnSpacing="4" Padding="4,6"
+                      BackgroundColor="{AppThemeBinding Light=#ECEFF3, Dark=#2A2E33}">
+                    <Label Grid.Column="0" Text="Pos" FontSize="11" FontAttributes="Bold" />
+                    <Label Grid.Column="1" Text="Player" FontSize="11" FontAttributes="Bold" />
+                    <Label Grid.Column="2" Text="OVR" FontSize="11" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                    <Label Grid.Column="3" Text="Age" FontSize="11" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                    <Label Grid.Column="4" Text="Apps" FontSize="11" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                    <Label Grid.Column="5" Text="Gls" FontSize="11" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+                </Grid>
+            </CollectionView.Header>
+        </CollectionView>
+
+    </Grid>
+
+</ContentPage>

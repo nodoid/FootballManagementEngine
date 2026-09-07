@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<Shell
+    x:Class="FootballManagementEngine.Maui.AppShell"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    xmlns:pages="clr-namespace:FootballManagementEngine.Maui.Pages"
+    Shell.FlyoutBehavior="Disabled"
+    Title="FM Engine Demo">
+
+    <TabBar>
+        <ShellContent Title="Club" ContentTemplate="{DataTemplate pages:ClubPage}" Route="club" />
+        <ShellContent Title="Fixtures" ContentTemplate="{DataTemplate pages:FixturesPage}" Route="fixtures" />
+        <ShellContent Title="Table" ContentTemplate="{DataTemplate pages:TablePage}" Route="table" />
+        <ShellContent Title="Squad" ContentTemplate="{DataTemplate pages:SquadPage}" Route="squad" />
+    </TabBar>
+
+</Shell>

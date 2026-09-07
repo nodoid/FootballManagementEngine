@@ -19,8 +19,10 @@
     <PackageReference Include="Microsoft.Data.Sqlite" Version="11.0.0-preview.7.26381.103" />
   </ItemGroup>
   <ItemGroup>
-    <!-- The test project lives under tests/ and is compiled by its own csproj. -->
+    <!-- The test and demo projects live under tests/ and demos/ and have their own csproj files. -->
     <Compile Remove="tests/**" />
     <None Remove="tests/**" />
+    <Compile Remove="demos/**" />
+    <None Remove="demos/**" />
   </ItemGroup>
 </Project>

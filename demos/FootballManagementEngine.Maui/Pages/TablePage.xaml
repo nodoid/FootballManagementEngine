@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="FootballManagementEngine.Maui.Pages.TablePage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Table">
+
+    <Grid RowDefinitions="Auto,Auto,*" Padding="12">
+
+        <Label Grid.Row="0" x:Name="DivisionLabel" FontSize="18" FontAttributes="Bold" Padding="4,8" />
+
+        <Grid Grid.Row="1" ColumnDefinitions="28,*,30,30,30,30,42,36" ColumnSpacing="2" Padding="4,6"
+              BackgroundColor="{AppThemeBinding Light=#ECEFF3, Dark=#2A2E33}">
+            <Label Grid.Column="0" Text="#" FontSize="11" FontAttributes="Bold" />
+            <Label Grid.Column="1" Text="Club" FontSize="11" FontAttributes="Bold" />
+            <Label Grid.Column="2" Text="P" FontSize="11" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+            <Label Grid.Column="3" Text="W" FontSize="11" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+            <Label Grid.Column="4" Text="D" FontSize="11" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+            <Label Grid.Column="5" Text="L" FontSize="11" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+            <Label Grid.Column="6" Text="GD" FontSize="11" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+            <Label Grid.Column="7" Text="Pts" FontSize="11" FontAttributes="Bold" HorizontalTextAlignment="Center" />
+        </Grid>
+
+        <CollectionView Grid.Row="2" x:Name="TableList">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Grid ColumnDefinitions="28,*,30,30,30,30,42,36" ColumnSpacing="2" Padding="4,9"
+                          BackgroundColor="{Binding RowColour}">
+                        <Label Grid.Column="0" Text="{Binding Position}" FontSize="12" TextColor="{Binding TextColour}" />
+                        <Label Grid.Column="1" Text="{Binding Name}" FontSize="13" LineBreakMode="TailTruncation"
+                               FontAttributes="{Binding Emphasis}" TextColor="{Binding TextColour}" />
+                        <Label Grid.Column="2" Text="{Binding Played}" FontSize="12" HorizontalTextAlignment="Center" TextColor="{Binding TextColour}" />
+                        <Label Grid.Column="3" Text="{Binding Won}" FontSize="12" HorizontalTextAlignment="Center" TextColor="{Binding TextColour}" />
+                        <Label Grid.Column="4" Text="{Binding Drawn}" FontSize="12" HorizontalTextAlignment="Center" TextColor="{Binding TextColour}" />
+                        <Label Grid.Column="5" Text="{Binding Lost}" FontSize="12" HorizontalTextAlignment="Center" TextColor="{Binding TextColour}" />
+                        <Label Grid.Column="6" Text="{Binding GoalDifference}" FontSize="12" HorizontalTextAlignment="Center" TextColor="{Binding TextColour}" />
+                        <Label Grid.Column="7" Text="{Binding Points}" FontSize="12" FontAttributes="Bold"
+                               HorizontalTextAlignment="Center" TextColor="{Binding TextColour}" />
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+    </Grid>
+
+</ContentPage>

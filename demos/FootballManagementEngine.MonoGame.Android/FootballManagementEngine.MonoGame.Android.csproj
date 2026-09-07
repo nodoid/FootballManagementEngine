@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-android</TargetFramework>
+    <OutputType>Exe</OutputType>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <LangVersion>latest</LangVersion>
+    <RootNamespace>FootballManagementEngine.MonoGameDemo</RootNamespace>
+    <AssemblyName>FootballManagementEngine.MonoGame.Android</AssemblyName>
+    <SupportedOSPlatformVersion>23</SupportedOSPlatformVersion>
+    <ApplicationId>com.footballmanagementengine.monogamedemo</ApplicationId>
+    <ApplicationVersion>1</ApplicationVersion>
+    <ApplicationDisplayVersion>1.0</ApplicationDisplayVersion>
+  </PropertyGroup>
+
+  <!-- The screens are shared source rather than a shared library: MonoGame ships a different
+       framework assembly per platform, so the game code must compile against each one. -->
+  <ItemGroup>
+    <Compile Include="../FootballManagementEngine.MonoGame.Shared/**/*.cs" LinkBase="Shared" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MonoGame.Framework.Android" Version="3.8.5.1" />
+    <ProjectReference Include="../FootballManagementEngine.Demo.Core/FootballManagementEngine.Demo.Core.csproj" />
+  </ItemGroup>
+
+  <!--
+    The engine saves and loads game state with reflection-based System.Text.Json, and
+    Microsoft.Data.Sqlite resolves its native provider dynamically. Neither survives an
+    aggressive link, so both assemblies are rooted; without this the app builds but fails
+    to save on device.
+  -->
+  <ItemGroup>
+    <TrimmerRootAssembly Include="FootballManagementEngine.Demo.Core" RootMode="all" />
+    <TrimmerRootAssembly Include="Microsoft.Data.Sqlite" RootMode="all" />
+  </ItemGroup>
+
+</Project>

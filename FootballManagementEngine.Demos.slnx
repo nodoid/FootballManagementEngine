@@ -1,0 +1,6 @@
+<Solution>
+  <Project Path="demos/FootballManagementEngine.Demo.Core/FootballManagementEngine.Demo.Core.csproj" />
+  <Project Path="demos/FootballManagementEngine.Maui/FootballManagementEngine.Maui.csproj" />
+  <Project Path="demos/FootballManagementEngine.MonoGame.Android/FootballManagementEngine.MonoGame.Android.csproj" />
+  <Project Path="demos/FootballManagementEngine.MonoGame.iOS/FootballManagementEngine.MonoGame.iOS.csproj" />
+</Solution>

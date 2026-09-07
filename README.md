@@ -300,6 +300,31 @@ table. League standings are recalculated from persisted fixtures and also materi
 SQLite `LeagueStandings` table. Cup competitions, rules, ties, replays, extra time and penalty
 results are retained in the complete saved state and indexed competition snapshot.
 
+## Tests
+
+An NUnit suite covering the engine lives in `tests/FootballManagementEngine.Tests`:
+
+```bash
+dotnet test FootballManagementEngine.slnx
+```
+
+## Demo apps
+
+Two mobile front ends over the same engine live in `demos/`, in their own solution so the
+main build stays fast:
+
+- **.NET MAUI** (`Android`, `iOS`, `Mac Catalyst`) - tabbed app: club picker, fixtures with
+  live match commentary, league table and squad.
+- **MonoGame** (`Android`, `iOS`) - a touch-driven game rendering the same season, with a
+  match screen that replays the engine's highlights against a running clock.
+
+```bash
+dotnet build FootballManagementEngine.Demos.slnx
+```
+
+See [demos/README.md](demos/README.md) for how to run each one and why the demos reference
+`FootballManagementEngine.Demo.Core` rather than this project directly.
+
 ## License
 
 Released under the DILLIGAF license. 

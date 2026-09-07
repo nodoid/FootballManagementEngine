@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="FootballManagementEngine.Maui.Pages.FixturesPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Fixtures">
+
+    <Grid RowDefinitions="Auto,*">
+
+        <VerticalStackLayout Grid.Row="0" Padding="16" Spacing="12">
+
+            <Label x:Name="NoClubLabel" Text="Pick a club on the Club tab to see its fixtures."
+                   IsVisible="False" TextColor="Gray" />
+
+            <Border x:Name="NextCard" IsVisible="False" Padding="16" StrokeThickness="0"
+                    BackgroundColor="#12305B">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="14" />
+                </Border.StrokeShape>
+                <VerticalStackLayout Spacing="4">
+                    <Label x:Name="NextCompetitionLabel" FontSize="12" TextColor="#7FA6D4" />
+                    <Label x:Name="NextOpponentLabel" FontSize="22" FontAttributes="Bold" TextColor="White" />
+                    <Label x:Name="NextDateLabel" FontSize="13" TextColor="#9FC4F0" />
+                </VerticalStackLayout>
+            </Border>
+
+            <Button x:Name="PlayButton" Text="Play match" Clicked="OnPlayMatch" IsVisible="False" />
+
+            <Border x:Name="ResultCard" IsVisible="False" Padding="16" StrokeThickness="1"
+                    Stroke="#2F7D32" BackgroundColor="{AppThemeBinding Light=#EAF6EA, Dark=#16301A}">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="14" />
+                </Border.StrokeShape>
+                <VerticalStackLayout Spacing="8">
+                    <Label x:Name="ResultScoreLabel" FontSize="20" FontAttributes="Bold" HorizontalOptions="Center" />
+                    <Label x:Name="ResultVerdictLabel" FontSize="14" HorizontalOptions="Center" TextColor="Gray" />
+                    <CollectionView x:Name="HighlightList" HeightRequest="180">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid Padding="0,4" ColumnDefinitions="40,*" ColumnSpacing="8">
+                                    <Label Grid.Column="0" Text="{Binding Minute}" FontAttributes="Bold" FontSize="13" />
+                                    <Label Grid.Column="1" Text="{Binding Description}" FontSize="13" LineBreakMode="WordWrap" />
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+            </Border>
+
+        </VerticalStackLayout>
+
+        <CollectionView Grid.Row="1" x:Name="FixtureList" Margin="16,0,16,16">
+            <CollectionView.Header>
+                <Label Text="Season calendar" FontAttributes="Bold" Padding="0,8" />
+            </CollectionView.Header>
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Grid Padding="0,9" ColumnDefinitions="58,*,Auto,34" ColumnSpacing="8">
+                        <Label Grid.Column="0" Text="{Binding Date}" FontSize="12" TextColor="Gray" VerticalOptions="Center" />
+                        <Label Grid.Column="1" Text="{Binding Opponent}" FontSize="14" VerticalOptions="Center" />
+                        <Label Grid.Column="2" Text="{Binding Score}" FontSize="14" FontAttributes="Bold"
+                               TextColor="{Binding ScoreColour}" VerticalOptions="Center" />
+                        <Label Grid.Column="3" Text="{Binding Venue}" FontSize="12" TextColor="Gray"
+                               HorizontalOptions="End" VerticalOptions="Center" />
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+    </Grid>
+
+</ContentPage>

@@ -1,5 +1,19 @@
 # Changelog
 
+## Test suite, engine fixes and demo apps
+
+- Added an NUnit test suite (`tests/FootballManagementEngine.Tests`) covering the domain,
+  fixture generation, league tables, match simulation, transfers, the game and season
+  engines, SQLite persistence, the API layer and end-to-end game flows.
+- Fixed clean sheets being credited to the side that failed to score instead of the side
+  that conceded nothing.
+- Fixed relegated clubs falling two divisions in one pass: every league table is now
+  snapshotted before any club moves.
+- Balanced the promotion and relegation places so divisions keep their size across seasons
+  (League One now promotes 3, the National League 2).
+- Added .NET MAUI (Android/iOS/Mac Catalyst) and MonoGame (Android/iOS) demo apps under
+  `demos/`, sharing a `GameSession` application layer over the engine.
+
 ## Formation and match simulation update
 
 - Added configurable formations: 4-4-2, 4-3-3, 4-2-3-1, 3-5-2, 3-4-3,
