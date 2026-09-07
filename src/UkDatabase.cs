@@ -1,4 +1,4 @@
-namespace FootballManagementEngine;
+﻿namespace FootballManagementEngine;
 
 public static class UkDatabase
 {
@@ -13,11 +13,13 @@ public static class UkDatabase
 
         var game = new FootballGameEngine(null, persistence, autoSave);
 
+        // Each tier's relegation places must match the promotion places of the tier below,
+        // otherwise divisions grow or shrink every time the season rolls over.
         AddLeague(game, "PL", "Premier League", 1, 20, 3, 3, 4);
         AddLeague(game, "CH", "Championship", 2, 24, 3, 3, 4);
-        AddLeague(game, "L1", "League One", 3, 24, 4, 4, 4);
+        AddLeague(game, "L1", "League One", 3, 24, 3, 4, 4);
         AddLeague(game, "L2", "League Two", 4, 24, 4, 2, 4);
-        AddLeague(game, "NL", "National League", 5, 24, 4, 4, 2);
+        AddLeague(game, "NL", "National League", 5, 24, 2, 4, 2);
 
         var clubs = new[]
         {

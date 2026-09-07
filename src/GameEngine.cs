@@ -307,11 +307,11 @@ public sealed class FootballGameEngine
     private void UpdatePlayerStats(Fixture fixture, MatchResult result)
     {
         if (!State.Teams.TryGetValue(fixture.HomeTeamId, out var home) || !State.Teams.TryGetValue(fixture.AwayTeamId, out var away)) return;
-        UpdateTeamPlayerStats(home, result.HomeGoals, result.Highlights, fixture.HomeGoals.GetValueOrDefault(), fixture.AwayGoals.GetValueOrDefault());
-        UpdateTeamPlayerStats(away, result.AwayGoals, result.Highlights, fixture.AwayGoals.GetValueOrDefault(), fixture.HomeGoals.GetValueOrDefault());
+        UpdateTeamPlayerStats(home, result.HomeGoals, result.Highlights, fixture.AwayGoals.GetValueOrDefault());
+        UpdateTeamPlayerStats(away, result.AwayGoals, result.Highlights, fixture.HomeGoals.GetValueOrDefault());
     }
 
-    private void UpdateTeamPlayerStats(Team team, int goals, IReadOnlyList<MatchHighlight> highlights, int teamGoals, int opponentGoals)
+    private void UpdateTeamPlayerStats(Team team, int goals, IReadOnlyList<MatchHighlight> highlights, int opponentGoals)
     {
         var available = team.Players.Where(p => !p.Injured && p.SuspensionMatches == 0).ToList();
         if (available.Count == 0) return;
@@ -321,7 +321,8 @@ public sealed class FootballGameEngine
             if (!State.PlayerStats.TryGetValue(player.Id, out var stats))
                 State.PlayerStats[player.Id] = stats = new PlayerSeasonStats { PlayerId = player.Id, TeamId = team.Id, Season = State.Season };
             stats.Appearances++; stats.Starts++; stats.Minutes += 90;
-            if (teamGoals == 0) stats.CleanSheets++;
+            // A clean sheet is conceding nothing, so it depends on the opponent's score.
+            if (opponentGoals == 0) stats.CleanSheets++;
         }
 
         var goalHighlights = highlights.Where(h => h.Type == MatchEventType.Goal && h.TeamId == team.Id).ToList();

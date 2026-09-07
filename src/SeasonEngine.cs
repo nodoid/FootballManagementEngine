@@ -78,13 +78,18 @@ public sealed class SeasonEngine
     {
         var leagues = _game.State.Leagues.Values.OrderBy(x => x.Level).ToList();
 
+        // Every division is settled against its own final table, captured before anything moves.
+        // Rebuilding a table mid-pass would rank a club that has just dropped into a division
+        // against a season it did not play, sending it straight through to the tier below.
+        var finalTables = leagues.ToDictionary(x => x.Id, x => _game.GetLeagueTable(x.Id));
+
         for (int i = 0; i < leagues.Count - 1; i++)
         {
             var upper = leagues[i];
             var lower = leagues[i + 1];
 
-            var upperTable = _game.GetLeagueTable(upper.Id);
-            var lowerTable = _game.GetLeagueTable(lower.Id);
+            var upperTable = finalTables[upper.Id];
+            var lowerTable = finalTables[lower.Id];
 
             var relegated = upperTable.TakeLast(upper.RelegationSpots).Select(x => x.TeamId).ToList();
             var promoted = lowerTable.Take(lower.PromotionSpots).Select(x => x.TeamId).ToList();
