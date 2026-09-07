@@ -88,10 +88,20 @@ public partial class ClubPage : ContentPage
         if (formation != _session.Club.Formation) _session.SetFormation(formation);
     }
 
-    private void OnAdvanceWeek(object? sender, EventArgs e)
+    private async void OnAdvanceWeek(object? sender, EventArgs e)
     {
-        _session.AdvanceWeek();
+        var transfers = _session.AdvanceWeek();
         Refresh();
+
+        // A listed player may have been sold while the week passed.
+        var mine = _session.Involving(transfers);
+        if (mine.Count == 0) return;
+
+        var lines = mine.Select(t => t.FromClubId == _session.Club?.Id
+            ? $"{t.ToClubName} signed {t.PlayerName} for {TransferMarket.Money(t.Fee)}."
+            : $"You signed {t.PlayerName} from {t.FromClubName} for {TransferMarket.Money(t.Fee)}.");
+
+        await DisplayAlertAsync("Transfer news", string.Join("\n\n", lines), "OK");
     }
 
     /// <summary>Turns the enum name (F4231) into something readable (4-2-3-1).</summary>

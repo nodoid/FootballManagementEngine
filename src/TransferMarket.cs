@@ -26,6 +26,17 @@ public sealed record TransferResponse(TransferOutcome Outcome, string Message, d
     public bool Accepted => Outcome == TransferOutcome.Accepted;
 }
 
+/// <summary>A deal that went through, for a news feed or an end-of-week summary.</summary>
+public sealed record CompletedTransfer(
+    string PlayerId,
+    string PlayerName,
+    Position Position,
+    string FromClubId,
+    string FromClubName,
+    string ToClubId,
+    string ToClubName,
+    decimal Fee);
+
 /// <summary>One player on the market, with everything a shortlist screen needs.</summary>
 public sealed record TransferListing(
     string PlayerId,

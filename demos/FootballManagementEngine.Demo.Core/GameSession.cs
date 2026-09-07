@@ -375,8 +375,18 @@ public sealed class GameSession
 
     public bool IsTransferListed(string playerId) => Game.IsListedForTransfer(playerId);
 
-    /// <summary>Moves the calendar on a week, paying wages and healing injuries.</summary>
-    public void AdvanceWeek() => _season.ProcessWeek();
+    /// <summary>
+    /// Moves the calendar on a week, paying wages and healing injuries. Returns any transfers
+    /// the rest of the league completed while the week passed, so a manager finds out when one
+    /// of their listed players has been sold.
+    /// </summary>
+    public IReadOnlyList<CompletedTransfer> AdvanceWeek() => _season.ProcessWeek();
+
+    /// <summary>The subset of a week's transfers that involved the managed club.</summary>
+    public IReadOnlyList<CompletedTransfer> Involving(IEnumerable<CompletedTransfer> transfers) =>
+        Club is { } club
+            ? transfers.Where(t => t.FromClubId == club.Id || t.ToClubId == club.Id).ToList()
+            : [];
 
     /// <summary>Wipes the save so the demo can be restarted from the club picker.</summary>
     public void ResetSeason()

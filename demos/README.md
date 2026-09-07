@@ -88,7 +88,8 @@ Pick a club and you get:
   potential, with the transfer window open in summer and January. Tapping a player bids their
   club's asking price. Your own squad is never on the market unless you put it there: tap a
   player on the Squad screen to list them, which drops their price from the not-for-sale
-  premium to their plain value.
+  premium to their plain value. Once listed, other clubs bid for them as the weeks pass - but
+  only clubs the player would actually improve, and only while the window is open.
 - **Injuries and substitutions** — a player can limp off mid-match. The clock stops on the
   minute it happens, the bench is offered, and play resumes to full time once a replacement
   is named. Squad order *is* team selection, so the substitute simply takes the injured

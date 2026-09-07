@@ -271,7 +271,24 @@ public sealed class DemoGame : Game
         var canPlay = _session.NextFixture is not null;
 
         if (_ui.Button(_batch, play, "PLAY MATCH", canPlay)) StartMatch();
-        if (_ui.Button(_batch, week, "WEEK +1")) { _session.AdvanceWeek(); _marketStale = true; }
+        if (_ui.Button(_batch, week, "WEEK +1"))
+        {
+            var transfers = _session.AdvanceWeek();
+            _marketStale = true;
+
+            // Tell the manager when one of their listed players has been sold.
+            var mine = _session.Involving(transfers);
+            if (mine.Count > 0)
+            {
+                var deal = mine[0];
+                _marketMessage = deal.FromClubId == club.Id
+                    ? $"{deal.ToClubName} SIGN {deal.PlayerName} FOR {Money(deal.Fee)}"
+                    : $"SIGNED {deal.PlayerName} FROM {deal.FromClubName}";
+                _marketMessageSeconds = 6f;
+                _tab = HubTab.Market;
+                _listScroll.Reset();
+            }
+        }
 
         // Formation, the same control the MAUI club page offers.
         var formationRow = new Rectangle(8, 160, Ui.CanvasWidth - 16, 26);

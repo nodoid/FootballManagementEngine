@@ -57,7 +57,11 @@ public sealed class SeasonEngine
         }
     }
 
-    public void ProcessWeek()
+    /// <summary>
+    /// Moves the game on a week: wages, recoveries, the transfer window and the calendar.
+    /// Returns any transfers the rest of the league completed while the week passed.
+    /// </summary>
+    public IReadOnlyList<CompletedTransfer> ProcessWeek()
     {
         TransferEngine.WeeklyFinanceUpdate(_game.State.Teams.Values);
 
@@ -73,8 +77,13 @@ public sealed class SeasonEngine
         // Players who have just recovered become selectable again.
         _game.RefreshAllSelections();
 
+        // Other clubs move for anyone on the transfer list. This runs for the week that has just
+        // passed, before the clock moves on, so the last week of a window still gets a round.
+        var transfers = _game.RunAiTransferRound(_rng, _game.State.PlayerTeamId);
+
         _game.State.CurrentDateUtc = _game.State.CurrentDateUtc.AddDays(7);
         _game.SaveIfConfigured();
+        return transfers;
     }
 
     public void PromoteAndRelegate()

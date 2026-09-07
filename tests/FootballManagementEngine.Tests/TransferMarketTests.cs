@@ -534,3 +534,188 @@ public class TransferListOwnershipTests
         Assert.That(_engine.State.TransferListed, Is.Empty);
     }
 }
+
+[TestFixture]
+public class AiTransferRoundTests
+{
+    private FootballGameEngine _engine = null!;
+    private Team _mine = null!;
+
+    [SetUp]
+    public void SetUp()
+    {
+        _engine = new FootballGameEngine();
+        _engine.State.CurrentDateUtc = new DateTime(2026, 7, 1, 12, 0, 0, DateTimeKind.Utc);
+
+        _mine = TestData.MakeTeam("MINE", squadSize: 22, overall: 60);
+        _engine.AddTeam(_mine);
+
+        // A league of clubs who could use a better player and can pay for one.
+        foreach (var id in new[] { "AAA", "BBB", "CCC", "DDD" })
+            _engine.AddTeam(TestData.MakeTeam(id, squadSize: 22, overall: 55, transferBudget: 80_000_000m));
+    }
+
+    /// <summary>A player clearly better than anything the other clubs have.</summary>
+    private Player ListAStar()
+    {
+        var star = _mine.Players[8];
+        star.Overall = 90;
+        star.Age = 26;
+        _engine.ListForTransfer(star.Id);
+        return star;
+    }
+
+    [Test]
+    public void ListedPlayers_AttractBidsFromOtherClubs()
+    {
+        var star = ListAStar();
+
+        // Several weeks, since interest is not certain in any one of them.
+        var deals = new List<CompletedTransfer>();
+        for (var week = 0; week < 12 && deals.Count == 0; week++)
+            deals.AddRange(_engine.RunAiTransferRound(new Random(week + 1)));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(deals, Is.Not.Empty, "nobody moved for a listed 90-rated player in twelve weeks");
+            Assert.That(deals[0].PlayerId, Is.EqualTo(star.Id));
+            Assert.That(deals[0].FromClubId, Is.EqualTo("MINE"));
+            Assert.That(_mine.Players, Does.Not.Contain(star));
+        });
+    }
+
+    [Test]
+    public void ASaleMovesTheFeeAndClearsTheListing()
+    {
+        var star = ListAStar();
+        var asking = TransferMarket.AskingPrice(star, listedByClub: true);
+        var balance = _mine.Balance;
+
+        var deals = new List<CompletedTransfer>();
+        for (var week = 0; week < 12 && deals.Count == 0; week++)
+            deals.AddRange(_engine.RunAiTransferRound(new Random(week + 1)));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(deals[0].Fee, Is.EqualTo(asking));
+            Assert.That(_mine.Balance, Is.EqualTo(balance + asking));
+            Assert.That(_engine.IsListedForTransfer(star.Id), Is.False);
+            Assert.That(_engine.State.News, Has.Some.Contains(star.Name));
+        });
+    }
+
+    [Test]
+    public void UnlistedPlayers_AreNeverBought()
+    {
+        var before = _mine.Players.Select(p => p.Id).ToList();
+
+        for (var week = 0; week < 30; week++) _engine.RunAiTransferRound(new Random(week + 1));
+
+        Assert.That(_mine.Players.Select(p => p.Id), Is.EqualTo(before));
+    }
+
+    [Test]
+    public void NobodyBidsWhileTheWindowIsShut()
+    {
+        ListAStar();
+        _engine.State.CurrentDateUtc = new DateTime(2026, 10, 1, 12, 0, 0, DateTimeKind.Utc);
+
+        var deals = new List<CompletedTransfer>();
+        for (var week = 0; week < 20; week++) deals.AddRange(_engine.RunAiTransferRound(new Random(week + 1)));
+
+        Assert.That(deals, Is.Empty);
+    }
+
+    [Test]
+    public void ClubsThatCannotAfford_DoNotBid()
+    {
+        ListAStar();
+        foreach (var team in _engine.State.Teams.Values) team.TransferBudget = 1_000m;
+
+        var deals = new List<CompletedTransfer>();
+        for (var week = 0; week < 20; week++) deals.AddRange(_engine.RunAiTransferRound(new Random(week + 1)));
+
+        Assert.That(deals, Is.Empty);
+    }
+
+    [Test]
+    public void ClubsAlreadyBetterServed_DoNotBid()
+    {
+        var listed = _mine.Players[8];
+        listed.Overall = 40;
+        _engine.ListForTransfer(listed.Id);
+
+        var deals = new List<CompletedTransfer>();
+        for (var week = 0; week < 20; week++) deals.AddRange(_engine.RunAiTransferRound(new Random(week + 1)));
+
+        Assert.That(deals, Is.Empty, "nobody should want a player worse than what they have");
+    }
+
+    [Test]
+    public void AClubAtTheMinimumSquadSize_KeepsItsListedPlayer()
+    {
+        var star = ListAStar();
+        _mine.Players.RemoveAll(p => p.Id != star.Id && _mine.Players.Count > TransferMarket.MinimumSquadSize);
+
+        var deals = new List<CompletedTransfer>();
+        for (var week = 0; week < 20; week++) deals.AddRange(_engine.RunAiTransferRound(new Random(week + 1)));
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(deals, Is.Empty);
+            Assert.That(_mine.Players, Does.Contain(star));
+        });
+    }
+
+    [Test]
+    public void TheManagedClubIsNeverAnAutomaticBuyer()
+    {
+        var other = _engine.State.Teams["AAA"];
+        var star = other.Players[8];
+        star.Overall = 95;
+        _engine.ListForTransfer(star.Id);
+        _mine.TransferBudget = 500_000_000m;
+
+        for (var week = 0; week < 20; week++)
+            _engine.RunAiTransferRound(new Random(week + 1), excludeBuyerClubId: "MINE");
+
+        Assert.That(_mine.Players.Select(p => p.Id), Does.Not.Contain(star.Id));
+    }
+
+    [Test]
+    public void ProcessWeek_ReportsTheTransfersItCompleted()
+    {
+        _engine.AddLeague(TestData.MakeLeague("PL", 1, ["MINE", "AAA", "BBB", "CCC", "DDD"]));
+        var star = ListAStar();
+        var season = new SeasonEngine(_engine);
+
+        var sold = false;
+        for (var week = 0; week < 12 && !sold; week++)
+            sold = season.ProcessWeek().Any(t => t.PlayerId == star.Id);
+
+        Assert.That(sold, Is.True, "advancing weeks should eventually sell a listed star");
+    }
+
+    [Test]
+    public void ASale_LeavesBothSquadsWithALegalEleven()
+    {
+        var star = ListAStar();
+
+        for (var week = 0; week < 12; week++)
+        {
+            var deals = _engine.RunAiTransferRound(new Random(week + 1));
+            if (deals.Count == 0) continue;
+
+            var buyer = _engine.State.Teams[deals[0].ToClubId];
+            Assert.Multiple(() =>
+            {
+                Assert.That(buyer.Players.Count(p => p.Selected), Is.EqualTo(11));
+                Assert.That(_mine.Players.Count(p => p.Selected), Is.EqualTo(11));
+                Assert.That(buyer.Players.Any(p => p.Id == star.Id), Is.True);
+            });
+            return;
+        }
+
+        Assert.Fail("no transfer completed");
+    }
+}

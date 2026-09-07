@@ -29,6 +29,11 @@
 - Added `ListForTransfer` / `WithdrawFromTransferList`, persisted in `GameState`. Nothing lists
   a player automatically: a squad member reaches the market only when their manager puts them
   there.
+- Added `RunAiTransferRound`: while the window is open, the rest of the league bids for the
+  players managers have listed. Only listed players attract interest, and only from clubs the
+  player would improve, who can afford the fee and have room in the squad. `SeasonEngine.
+  ProcessWeek` runs a round each week and returns the deals it completed, so the apps can tell
+  a manager one of their players has been sold.
 - Money is formatted in pounds regardless of the device's locale.
 
 ## Player state, substitutes and in-match injuries

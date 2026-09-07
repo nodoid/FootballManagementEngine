@@ -635,6 +635,64 @@ public sealed class FootballGameEngine
             $"{buyer.Name} sign {player.Name} for {TransferMarket.Money(fee)}.", fee);
     }
 
+    /// <summary>How likely an interested club is to actually bid in a given week.</summary>
+    private const double AiBidChance = 0.45;
+
+    /// <summary>
+    /// Lets the rest of the league bid for the players managers have put on the transfer list.
+    /// Runs once a week while the window is open. Only listed players attract interest, and only
+    /// from clubs the player would actually improve, so a squad is never picked apart at random.
+    /// </summary>
+    public IReadOnlyList<CompletedTransfer> RunAiTransferRound(Random rng, string? excludeBuyerClubId = null)
+    {
+        var deals = new List<CompletedTransfer>();
+        if (!IsTransferWindowOpen) return deals;
+
+        foreach (var playerId in State.TransferListed.ToList())
+        {
+            var (seller, player) = FindPlayerOrDefault(playerId);
+            if (seller is null || player is null) continue;
+            if (seller.Players.Count <= TransferMarket.MinimumSquadSize) continue;
+
+            var asking = TransferMarket.AskingPrice(player, listedByClub: true);
+            var wage = TransferMarket.ExpectedWage(player);
+
+            var suitors = State.Teams.Values
+                .Where(t => t.Id != seller.Id && t.Id != excludeBuyerClubId)
+                .Where(t => t.Players.Count < TransferMarket.MaximumSquadSize)
+                .Where(t => t.TransferBudget >= asking)
+                .Where(t => WouldImprove(t, player))
+                .OrderByDescending(t => t.Reputation)
+                .ThenBy(t => t.Id, StringComparer.Ordinal)
+                .ToList();
+
+            if (suitors.Count == 0) continue;
+            if (rng.NextDouble() > AiBidChance) continue;
+
+            // One of the keenest few, so the biggest club does not always win the race.
+            var buyer = suitors[rng.Next(Math.Min(3, suitors.Count))];
+            var sellerName = seller.Name;
+
+            var response = Bid(buyer.Id, player.Id, asking, wage);
+            if (!response.Accepted) continue;
+
+            deals.Add(new CompletedTransfer(
+                player.Id, player.Name, player.Position,
+                seller.Id, sellerName, buyer.Id, buyer.Name, asking));
+        }
+
+        return deals;
+    }
+
+    /// <summary>Whether a player is better than what a club already has in that position.</summary>
+    private static bool WouldImprove(Team club, Player player)
+    {
+        var samePosition = club.Players.Where(p => p.Position == player.Position).ToList();
+        if (samePosition.Count == 0) return true;
+
+        return player.Overall > samePosition.Average(p => p.Overall);
+    }
+
     private Player FindPlayer(string playerId) =>
         FindPlayerOrDefault(playerId).Player
         ?? throw new KeyNotFoundException($"Player '{playerId}' not found.");
