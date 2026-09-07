@@ -84,8 +84,8 @@ Pick a club and you get:
 - **Squad** — the matchday squad in selection order: the starting eleven first (ticked in the
   *State* column), then the four substitutes (`S`), then the reserves, with injured players
   (`I`) pushed to the bottom. Appearances, goals and ratings per player, plus the wage bill.
-- **Transfers** — a market of every player at every other club, priced from ability, age and
-  potential, with the transfer window open in summer and January. Tapping a player bids their
+- **Transfers** — a market of every player at every other club, showing the division they play
+  in, priced from ability, age and potential, with the window open in summer and January. Tapping a player bids their
   club's asking price. Your own squad is never on the market unless you put it there: tap a
   player on the Squad screen to list them, which drops their price from the not-for-sale
   premium to their plain value. Once listed, other clubs bid for them as the weeks pass - but

@@ -391,7 +391,15 @@ public sealed class DemoGame : Game
             _ui.Text(_batch, "TAP A PLAYER TO BID THE ASKING PRICE", 8, viewport.Y + 16, Palette.TextDim);
         }
 
-        var list = new Rectangle(viewport.X, viewport.Y + 30, viewport.Width, viewport.Height - 30);
+        var header = viewport.Y + 30;
+        _ui.Fill(_batch, new Rectangle(0, header, Ui.CanvasWidth, 14), Palette.PanelAlt);
+        _ui.Text(_batch, "PLAYER", 40, header + 4, Palette.TextDim);
+        _ui.Text(_batch, "CLUB", 146, header + 4, Palette.TextDim);
+        _ui.TextRight(_batch, "DIV", 240, header + 4, Palette.TextDim);
+        _ui.TextRight(_batch, "OVR", 272, header + 4, Palette.TextDim);
+        _ui.TextRight(_batch, "FEE", 352, header + 4, Palette.TextDim);
+
+        var list = new Rectangle(viewport.X, header + 14, viewport.Width, viewport.Height - 44);
         _listScroll.Update(_ui, list.Height, _market.Count * 22, elapsed);
 
         var y = list.Y - (int)_listScroll.Offset;
@@ -404,9 +412,10 @@ public sealed class DemoGame : Game
                 if (listing.ListedByClub) _ui.Fill(_batch, row, Palette.Panel);
 
                 _ui.Text(_batch, listing.Position.ToString(), 8, y + 7, PositionColour(listing.Position));
-                _ui.Text(_batch, _font.Fit(listing.PlayerName.ToUpperInvariant(), 118), 40, y + 7, Palette.Text);
-                _ui.Text(_batch, _font.Fit(listing.ClubName.ToUpperInvariant(), 70), 166, y + 7, Palette.TextDim);
-                _ui.TextRight(_batch, $"{listing.Overall}", 262, y + 7, Palette.TextDim);
+                _ui.Text(_batch, _font.Fit(listing.PlayerName.ToUpperInvariant(), 100), 40, y + 7, Palette.Text);
+                _ui.Text(_batch, _font.Fit(listing.ClubName.ToUpperInvariant(), 60), 146, y + 7, Palette.TextDim);
+                _ui.TextRight(_batch, listing.LeagueId.ToUpperInvariant(), 240, y + 7, Palette.Accent);
+                _ui.TextRight(_batch, $"{listing.Overall}", 272, y + 7, Palette.TextDim);
                 _ui.TextRight(_batch, Money(listing.AskingPrice), 352, y + 7,
                     affordable && open ? Palette.Win : Palette.TextDim);
             }

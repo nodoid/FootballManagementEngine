@@ -35,6 +35,9 @@
   ProcessWeek` runs a round each week and returns the deals it completed, so the apps can tell
   a manager one of their players has been sold.
 - Money is formatted in pounds regardless of the device's locale.
+- Every player in the game now has a distinct name, drawn from 64 first names and 64 surnames.
+  The old twenty-name pool was reused at every club, which made the transfer market unreadable.
+- The transfer screens show which division a player's club plays in.
 
 ## Player state, substitutes and in-match injuries
 

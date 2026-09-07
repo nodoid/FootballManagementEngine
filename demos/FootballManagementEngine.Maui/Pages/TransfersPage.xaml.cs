@@ -66,7 +66,8 @@ public partial class TransfersPage : ContentPage
                 listing.PlayerId,
                 listing.Position.ToString(),
                 listing.PlayerName,
-                $"{listing.ClubName} · age {listing.Age}{(listing.ListedByClub ? " · transfer listed" : "")}",
+                $"{listing.ClubName} · {_session.LeagueName(listing.LeagueId)} · age {listing.Age}" +
+                    (listing.ListedByClub ? " · transfer listed" : ""),
                 listing.Overall,
                 Compact(listing.AskingPrice),
                 PositionColour(listing.Position),
@@ -85,7 +86,7 @@ public partial class TransfersPage : ContentPage
 
         var confirmed = await DisplayAlertAsync(
             $"Bid for {quote.PlayerName}?",
-            $"{quote.ClubName} want {TransferMarket.Money(quote.AskingPrice)}.\n" +
+            $"{quote.ClubName} ({_session.LeagueName(quote.LeagueId)}) want {TransferMarket.Money(quote.AskingPrice)}.\n" +
             $"Wages {TransferMarket.Money(TransferMarket.ExpectedWage(new Player { WeeklyWage = quote.WeeklyWage }))} a week.\n" +
             $"Your budget is {TransferMarket.Money(_session.TransferBudget)}.",
             "Bid", "Cancel");

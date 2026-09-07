@@ -148,6 +148,30 @@ public class UkDatabaseTests
     }
 
     [Test]
+    public void Create_GivesEveryPlayerInTheGameADistinctName()
+    {
+        // A shared pool of names made the transfer market unreadable, with the same handful of
+        // players appearing at a dozen clubs.
+        var names = NewGame().State.Teams.Values.SelectMany(t => t.Players).Select(p => p.Name).ToList();
+
+        Assert.Multiple(() =>
+        {
+            Assert.That(names, Has.Count.EqualTo(116 * 22));
+            Assert.That(names, Is.Unique);
+            Assert.That(names, Is.All.Match(@"^\S+ \S+$"));
+        });
+    }
+
+    [Test]
+    public void Create_GivesEachClubDistinctNamesWithinItsOwnSquad()
+    {
+        var game = NewGame();
+
+        foreach (var team in game.State.Teams.Values)
+            Assert.That(team.Players.Select(p => p.Name), Is.Unique, team.Id);
+    }
+
+    [Test]
     public void Create_GivesPlayersPlausibleAttributes()
     {
         var players = NewGame().State.Teams.Values.SelectMany(t => t.Players).ToList();

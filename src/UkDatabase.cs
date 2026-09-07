@@ -68,13 +68,33 @@ public static class UkDatabase
             ("YOR","York City","NL"),("SUT","Sutton United","NL"),("BRO2","Boreham Wood","NL")
         };
 
-        var names = new[]
+        // 64 x 64 combinations, drawn in order, so all 2,552 players get a distinct name.
+        // Reusing a short list made the transfer market unreadable - a dozen William Roberts.
+        var firstNames = new[]
         {
-            "Jack Wilson","Oliver Smith","Harry Taylor","George Brown","Charlie Davies",
-            "Thomas Evans","James Thomas","William Roberts","Daniel Johnson","Archie Walker",
-            "Freddie Wright","Oscar Thompson","Henry White","Alfie Hughes","Leo Edwards",
-            "Theo Green","Arthur Hall","Finley Lewis","Lucas Harris","Noah Clarke"
+            "Jack","Oliver","Harry","George","Charlie","Thomas","James","William",
+            "Daniel","Archie","Freddie","Oscar","Henry","Alfie","Leo","Theo",
+            "Arthur","Finley","Lucas","Noah","Ethan","Mason","Logan","Riley",
+            "Callum","Connor","Liam","Owen","Jude","Reece","Tyler","Kieran",
+            "Declan","Ellis","Rhys","Cameron","Aaron","Bailey","Marcus","Nathan",
+            "Joel","Kai","Jamie","Ryan","Sean","Dean","Craig","Scott",
+            "Grant","Ross","Stuart","Gary","Wayne","Frank","Trevor","Clive",
+            "Bruce","Neil","Alan","Keith","Dennis","Vincent","Gordon","Malcolm"
         };
+
+        var surnames = new[]
+        {
+            "Wilson","Smith","Taylor","Brown","Davies","Evans","Thomas","Roberts",
+            "Johnson","Walker","Wright","Thompson","White","Hughes","Edwards","Green",
+            "Hall","Lewis","Harris","Clarke","Baker","Turner","Hill","Cooper",
+            "Ward","Morris","Cook","Bell","Murphy","Bailey","Rivers","Watson",
+            "Price","Reid","Gray","Barnes","Fletcher","Palmer","Shaw","Holmes",
+            "Rowe","Chapman","Knight","Marsh","Dixon","Ellis","Doyle","Byrne",
+            "Kelly","Duffy","Regan","Nolan","Sheridan","Quinn","Bannon","Carver",
+            "Ashton","Milburn","Lowe","Sutton","Vance","Waring","Yates","Alder"
+        };
+
+        var playerNumber = 0;
 
         foreach (var (id, name, league) in clubs)
         {
@@ -85,7 +105,7 @@ public static class UkDatabase
                 players.Add(new Player
                 {
                     Id = $"{id}-P{p + 1:00}",
-                    Name = names[(p + id.Length) % names.Length],
+                    Name = $"{firstNames[playerNumber / surnames.Length % firstNames.Length]} {surnames[playerNumber % surnames.Length]}",
                     // Two keepers, so a club always has cover in goal and can name one on the bench.
                     Position = p switch { < 2 => Position.GK, < 9 => Position.DEF, < 17 => Position.MID, _ => Position.FWD },
                     Age = 18 + ((p * 3 + id.Length) % 18),
@@ -100,6 +120,8 @@ public static class UkDatabase
                     ContractClubId = id,
                     ContractYears = 1 + p % 4
                 });
+
+                playerNumber++;
             }
 
             game.AddTeam(new Team
