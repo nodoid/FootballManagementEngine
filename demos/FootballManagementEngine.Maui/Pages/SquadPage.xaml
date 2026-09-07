@@ -10,9 +10,11 @@
         <VerticalStackLayout Grid.Row="0" Padding="4,8" Spacing="2">
             <Label x:Name="SquadHeader" FontSize="18" FontAttributes="Bold" />
             <Label x:Name="WageLabel" FontSize="12" TextColor="Gray" />
+            <Label Text="Tap a player to put them on, or take them off, the transfer list."
+                   FontSize="11" TextColor="Gray" />
         </VerticalStackLayout>
 
-        <CollectionView Grid.Row="1" x:Name="SquadList">
+        <CollectionView Grid.Row="1" x:Name="SquadList" SelectionMode="Single" SelectionChanged="OnPlayerSelected">
             <CollectionView.ItemTemplate>
                 <DataTemplate>
                     <Grid ColumnDefinitions="40,*,44,34,34,34,34" ColumnSpacing="4" Padding="4,10">
@@ -21,6 +23,8 @@
                         <VerticalStackLayout Grid.Column="1" Spacing="1" VerticalOptions="Center">
                             <Label Text="{Binding Name}" FontSize="14" LineBreakMode="TailTruncation" />
                             <Label Text="{Binding Status}" FontSize="11" TextColor="{Binding StatusColour}" />
+                            <Label Text="{Binding Listing}" FontSize="11" FontAttributes="Bold"
+                                   TextColor="#C77700" IsVisible="{Binding IsListed}" />
                         </VerticalStackLayout>
                         <Label Grid.Column="2" Text="{Binding Badge}" FontSize="15" FontAttributes="Bold"
                                HorizontalTextAlignment="Center" HorizontalOptions="Center"

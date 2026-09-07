@@ -501,6 +501,154 @@ public sealed class FootballGameEngine
             .OrderBy(f => f.DateUtc);
     }
 
+    // ---------- transfer market ----------
+
+    public TransferWindow TransferWindow => TransferMarket.WindowFor(State.CurrentDateUtc);
+    public bool IsTransferWindowOpen => TransferMarket.IsWindowOpen(State.CurrentDateUtc);
+
+    /// <summary>Puts a player up for sale, which lowers what their club will accept.</summary>
+    public void ListForTransfer(string playerId)
+    {
+        FindPlayer(playerId);
+        State.TransferListed.Add(playerId);
+        AutoSaveIfEnabled();
+    }
+
+    public void WithdrawFromTransferList(string playerId)
+    {
+        if (State.TransferListed.Remove(playerId)) AutoSaveIfEnabled();
+    }
+
+    public bool IsListedForTransfer(string playerId) => State.TransferListed.Contains(playerId);
+
+    /// <summary>
+    /// The market as a buying club sees it: every player at every other club, priced. Clubs that
+    /// have listed a player want its value; the rest want a premium to be talked into selling.
+    /// </summary>
+    public IReadOnlyList<TransferListing> TransferMarketListings(
+        string? excludeClubId = null,
+        Position? position = null,
+        decimal? maximumPrice = null,
+        int? minimumOverall = null,
+        string? search = null)
+    {
+        var results = new List<TransferListing>();
+
+        foreach (var team in State.Teams.Values)
+        {
+            if (team.Id == excludeClubId) continue;
+            // A club at the minimum squad size has nobody to spare.
+            if (team.Players.Count <= TransferMarket.MinimumSquadSize) continue;
+
+            foreach (var player in team.Players)
+            {
+                if (position is { } wanted && player.Position != wanted) continue;
+                if (minimumOverall is { } floor && player.Overall < floor) continue;
+                if (!string.IsNullOrWhiteSpace(search) &&
+                    player.Name.IndexOf(search, StringComparison.OrdinalIgnoreCase) < 0) continue;
+
+                var listed = State.TransferListed.Contains(player.Id);
+                var price = TransferMarket.AskingPrice(player, listed);
+                if (maximumPrice is { } cap && price > cap) continue;
+
+                results.Add(new TransferListing(
+                    player.Id, player.Name, player.Position, player.Age, player.Overall, player.Potential,
+                    player.WeeklyWage, team.Id, team.Name, team.LeagueId,
+                    TransferMarket.Value(player), price, listed));
+            }
+        }
+
+        return results
+            .OrderByDescending(x => x.ListedByClub)
+            .ThenByDescending(x => x.Overall)
+            .ThenBy(x => x.AskingPrice)
+            .ToList();
+    }
+
+    /// <summary>What a club would have to bid, and pay, to sign a given player.</summary>
+    public TransferListing? QuoteFor(string playerId)
+    {
+        var (team, player) = FindPlayerOrDefault(playerId);
+        if (team is null || player is null) return null;
+
+        var listed = State.TransferListed.Contains(player.Id);
+        return new TransferListing(
+            player.Id, player.Name, player.Position, player.Age, player.Overall, player.Potential,
+            player.WeeklyWage, team.Id, team.Name, team.LeagueId,
+            TransferMarket.Value(player), TransferMarket.AskingPrice(player, listed), listed);
+    }
+
+    /// <summary>
+    /// Bids for a player. Every rule is checked before any money or paperwork moves, so a
+    /// rejected bid leaves both clubs exactly as they were.
+    /// </summary>
+    public TransferResponse Bid(string buyingClubId, string playerId, decimal fee, decimal weeklyWage, int contractYears = 3)
+    {
+        if (!IsTransferWindowOpen)
+            return new TransferResponse(TransferOutcome.WindowClosed, "The transfer window is closed.");
+
+        if (!State.Teams.TryGetValue(buyingClubId, out var buyer))
+            return new TransferResponse(TransferOutcome.ClubNotFound, $"Club '{buyingClubId}' not found.");
+
+        var (seller, player) = FindPlayerOrDefault(playerId);
+        if (seller is null || player is null)
+            return new TransferResponse(TransferOutcome.PlayerNotFound, $"Player '{playerId}' not found.");
+
+        if (seller.Id == buyer.Id)
+            return new TransferResponse(TransferOutcome.OwnPlayer, $"{player.Name} already plays for {buyer.Name}.");
+
+        if (buyer.Players.Count >= TransferMarket.MaximumSquadSize)
+            return new TransferResponse(TransferOutcome.BuyingSquadFull,
+                $"{buyer.Name} already has {buyer.Players.Count} players.");
+
+        if (seller.Players.Count <= TransferMarket.MinimumSquadSize)
+            return new TransferResponse(TransferOutcome.SellingSquadTooSmall,
+                $"{seller.Name} cannot go below {TransferMarket.MinimumSquadSize} players.");
+
+        var asking = TransferMarket.AskingPrice(player, State.TransferListed.Contains(player.Id));
+        if (fee < asking)
+            return new TransferResponse(TransferOutcome.BidTooLow,
+                $"{seller.Name} want {TransferMarket.Money(asking)} for {player.Name}.", asking);
+
+        if (buyer.TransferBudget < fee)
+            return new TransferResponse(TransferOutcome.CannotAfford,
+                $"{buyer.Name} have {TransferMarket.Money(buyer.TransferBudget)} to spend.", asking);
+
+        var expected = TransferMarket.ExpectedWage(player);
+        if (weeklyWage < expected)
+            return new TransferResponse(TransferOutcome.WageTooLow,
+                $"{player.Name} wants {TransferMarket.Money(expected)} a week.", asking);
+
+        TransferEngine.Complete(seller, buyer, player, fee, weeklyWage, contractYears);
+        State.TransferListed.Remove(player.Id);
+
+        if (!State.PlayerStats.ContainsKey(player.Id))
+            State.PlayerStats[player.Id] = new PlayerSeasonStats { PlayerId = player.Id, TeamId = buyer.Id, Season = State.Season };
+
+        RefreshSelection(seller);
+        RefreshSelection(buyer);
+
+        State.News.Add($"{State.CurrentDateUtc:d MMM yyyy}: {buyer.Name} sign {player.Name} from {seller.Name} for {TransferMarket.Money(fee)}.");
+        AutoSaveIfEnabled();
+
+        return new TransferResponse(TransferOutcome.Accepted,
+            $"{buyer.Name} sign {player.Name} for {TransferMarket.Money(fee)}.", fee);
+    }
+
+    private Player FindPlayer(string playerId) =>
+        FindPlayerOrDefault(playerId).Player
+        ?? throw new KeyNotFoundException($"Player '{playerId}' not found.");
+
+    private (Team? Team, Player? Player) FindPlayerOrDefault(string playerId)
+    {
+        foreach (var team in State.Teams.Values)
+        {
+            var player = team.Players.FirstOrDefault(p => p.Id == playerId);
+            if (player is not null) return (team, player);
+        }
+        return (null, null);
+    }
+
     public string ExportState() => JsonSerializer.Serialize(State, JsonOptions);
 
     public static FootballGameEngine ImportState(string json, GamePersistence? persistence = null, bool autoSave = false)

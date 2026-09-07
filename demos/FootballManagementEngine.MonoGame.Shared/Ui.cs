@@ -68,12 +68,14 @@ public sealed class Ui : IDisposable
 
     public Vector2 ToVirtual(Vector2 screen) => (screen - _offset) / _scale;
 
-    /// <summary>Collects this frame's touch into a tap and a drag.</summary>
+    /// <summary>
+    /// Samples touch into a tap and a drag. MonoGame runs Update more than once per Draw whenever
+    /// it is catching up - which it does constantly on a software-rendered emulator - so input is
+    /// accumulated here and cleared by <see cref="EndFrame"/> once a frame has actually drawn.
+    /// Clearing it here instead silently loses taps.
+    /// </summary>
     public void Update()
     {
-        Tap = null;
-        DragY = 0f;
-
         var touches = TouchPanel.GetState();
         var touch = touches.Count > 0 ? touches[0] : default;
 
@@ -90,7 +92,7 @@ public sealed class Ui : IDisposable
                 if (touch.TryGetPreviousLocation(out var previous))
                 {
                     var delta = ToVirtual(touch.Position) - ToVirtual(previous.Position);
-                    DragY = delta.Y;
+                    DragY += delta.Y;
                     // A few pixels of travel turns a press into a scroll, so lists do not
                     // fire the row underneath the finger when the user was only scrolling.
                     if (Math.Abs(ToVirtual(touch.Position).Y - _pressOrigin.Y) > 6f) _dragging = true;
@@ -103,6 +105,13 @@ public sealed class Ui : IDisposable
                 _dragging = false;
                 break;
         }
+    }
+
+    /// <summary>Discards the input the frame just drawn consumed. Call at the end of Draw.</summary>
+    public void EndFrame()
+    {
+        Tap = null;
+        DragY = 0f;
     }
 
     // ---------- drawing ----------

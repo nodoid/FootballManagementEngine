@@ -13,7 +13,9 @@ public sealed record SquadMember(
     int InjuryWeeks,
     int Appearances,
     int Goals,
-    int CleanSheets)
+    int CleanSheets,
+    bool ListedForTransfer,
+    decimal Value)
 {
     /// <summary>The one-character badge for the squad list's State column.</summary>
     public string Badge => State switch
@@ -221,7 +223,8 @@ public sealed class GameSession
                     return (Order: order, Member: new SquadMember(
                         p.Id, p.Name, p.Position, p.State, p.Age, p.Overall, p.WeeklyWage,
                         p.Injured, p.InjuryWeeks,
-                        stats?.Appearances ?? 0, stats?.Goals ?? 0, stats?.CleanSheets ?? 0));
+                        stats?.Appearances ?? 0, stats?.Goals ?? 0, stats?.CleanSheets ?? 0,
+                        Game.IsListedForTransfer(p.Id), TransferMarket.Value(p)));
                 })
                 .OrderBy(x => x.Member.Injured ? 1 : 0)
                 .ThenBy(x => x.Order)
@@ -303,6 +306,74 @@ public sealed class GameSession
         Game.SaveIfConfigured();
         return true;
     }
+
+    // ---------- transfer market ----------
+
+    public bool IsTransferWindowOpen => Game.IsTransferWindowOpen;
+
+    public string TransferWindowLabel => Game.TransferWindow switch
+    {
+        FootballManagementEngine.TransferWindow.Summer => "Summer window open",
+        FootballManagementEngine.TransferWindow.Winter => "Winter window open",
+        _ => "Transfer window closed"
+    };
+
+    public decimal TransferBudget => Club?.TransferBudget ?? 0m;
+
+    /// <summary>Players the managed club could sign, cheapest useful filters exposed.</summary>
+    public IReadOnlyList<TransferListing> Market(
+        Position? position = null,
+        decimal? maximumPrice = null,
+        int? minimumOverall = null,
+        string? search = null) =>
+        Game.TransferMarketListings(Club?.Id, position, maximumPrice, minimumOverall, search);
+
+    /// <summary>What it would take to sign a player right now.</summary>
+    public TransferListing? Quote(string playerId) => Game.QuoteFor(playerId);
+
+    /// <summary>
+    /// Bids the asking price on the club's behalf, at the wage the player expects. The demos
+    /// deliberately do not haggle: the interesting part is whether the squad and budget allow it.
+    /// </summary>
+    public TransferResponse SignPlayer(string playerId)
+    {
+        if (Club is not { } club)
+            return new TransferResponse(TransferOutcome.ClubNotFound, "Pick a club first.");
+
+        if (Quote(playerId) is not { } quote)
+            return new TransferResponse(TransferOutcome.PlayerNotFound, "That player is no longer available.");
+
+        var response = Game.Bid(club.Id, playerId, quote.AskingPrice, TransferMarket.ExpectedWage(
+            club.Players.Concat(Game.State.Teams.Values.SelectMany(t => t.Players))
+                .First(p => p.Id == playerId)));
+
+        if (response.Accepted) PickMatchdaySquad(club);
+        if (response.Accepted) FootballGameEngine.RefreshSelection(club);
+        return response;
+    }
+
+    /// <summary>
+    /// Puts one of the club's own players up for sale, or takes them off the list. Nothing lists a
+    /// player automatically: a squad member is only ever on the market because the manager put
+    /// them there.
+    /// </summary>
+    public void SetTransferListed(string playerId, bool listed)
+    {
+        if (Club is not { } club || club.Players.All(p => p.Id != playerId)) return;
+
+        if (listed) Game.ListForTransfer(playerId);
+        else Game.WithdrawFromTransferList(playerId);
+    }
+
+    /// <summary>Flips a player between listed and not listed, and reports where they ended up.</summary>
+    public bool ToggleTransferListed(string playerId)
+    {
+        var listed = !Game.IsListedForTransfer(playerId);
+        SetTransferListed(playerId, listed);
+        return Game.IsListedForTransfer(playerId);
+    }
+
+    public bool IsTransferListed(string playerId) => Game.IsListedForTransfer(playerId);
 
     /// <summary>Moves the calendar on a week, paying wages and healing injuries.</summary>
     public void AdvanceWeek() => _season.ProcessWeek();

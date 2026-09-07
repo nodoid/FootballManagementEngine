@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage
+    x:Class="FootballManagementEngine.Maui.Pages.TransfersPage"
+    xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+    xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+    Title="Transfers">
+
+    <Grid RowDefinitions="Auto,*" Padding="12">
+
+        <VerticalStackLayout Grid.Row="0" Spacing="10" Padding="0,4,0,10">
+
+            <Label x:Name="NoClubLabel" Text="Pick a club on the Club tab to enter the market."
+                   IsVisible="False" TextColor="Gray" />
+
+            <Border x:Name="SummaryCard" IsVisible="False" Padding="14" StrokeThickness="0"
+                    BackgroundColor="#12305B">
+                <Border.StrokeShape>
+                    <RoundRectangle CornerRadius="12" />
+                </Border.StrokeShape>
+                <Grid ColumnDefinitions="*,Auto">
+                    <VerticalStackLayout Grid.Column="0" Spacing="2">
+                        <Label x:Name="WindowLabel" FontSize="15" FontAttributes="Bold" TextColor="White" />
+                        <Label x:Name="SquadLabel" FontSize="12" TextColor="#9FC4F0" />
+                    </VerticalStackLayout>
+                    <VerticalStackLayout Grid.Column="1" HorizontalOptions="End">
+                        <Label Text="Budget" FontSize="11" TextColor="#7FA6D4" HorizontalTextAlignment="End" />
+                        <Label x:Name="BudgetLabel" FontSize="18" FontAttributes="Bold" TextColor="White"
+                               HorizontalTextAlignment="End" />
+                    </VerticalStackLayout>
+                </Grid>
+            </Border>
+
+            <Grid x:Name="FilterRow" IsVisible="False" ColumnDefinitions="*,Auto" ColumnSpacing="8">
+                <SearchBar Grid.Column="0" x:Name="MarketSearch" Placeholder="Search players"
+                           TextChanged="OnFilterChanged" />
+                <Picker Grid.Column="1" x:Name="PositionPicker" WidthRequest="110" Title="Any"
+                        SelectedIndexChanged="OnFilterChanged" />
+            </Grid>
+
+            <Label x:Name="StatusLabel" IsVisible="False" FontSize="13" />
+
+        </VerticalStackLayout>
+
+        <CollectionView Grid.Row="1" x:Name="MarketList" SelectionMode="Single" SelectionChanged="OnPlayerSelected">
+            <CollectionView.ItemTemplate>
+                <DataTemplate>
+                    <Grid Padding="4,10" ColumnDefinitions="40,*,40,Auto" ColumnSpacing="8">
+                        <Label Grid.Column="0" Text="{Binding Position}" FontSize="11" FontAttributes="Bold"
+                               TextColor="{Binding PositionColour}" VerticalOptions="Center" />
+                        <VerticalStackLayout Grid.Column="1" Spacing="1" VerticalOptions="Center">
+                            <Label Text="{Binding Name}" FontSize="14" LineBreakMode="TailTruncation" />
+                            <Label Text="{Binding Detail}" FontSize="11" TextColor="Gray"
+                                   LineBreakMode="TailTruncation" />
+                        </VerticalStackLayout>
+                        <Label Grid.Column="2" Text="{Binding Overall}" FontSize="14" FontAttributes="Bold"
+                               HorizontalTextAlignment="Center" VerticalOptions="Center" />
+                        <Label Grid.Column="3" Text="{Binding Price}" FontSize="14" FontAttributes="Bold"
+                               TextColor="{Binding PriceColour}" VerticalOptions="Center" />
+                    </Grid>
+                </DataTemplate>
+            </CollectionView.ItemTemplate>
+        </CollectionView>
+
+    </Grid>
+
+</ContentPage>

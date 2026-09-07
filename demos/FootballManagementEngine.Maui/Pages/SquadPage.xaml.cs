@@ -5,8 +5,9 @@ namespace FootballManagementEngine.Maui.Pages;
 
 /// <summary>A squad member as the list draws them.</summary>
 public sealed record PlayerRow(
-    string Position, string Name, string Status, string Badge, int Overall, int Age,
-    int Appearances, int Goals, Color PositionColour, Color StatusColour, Color BadgeColour);
+    string PlayerId, string Position, string Name, string Status, string Badge, int Overall, int Age,
+    int Appearances, int Goals, Color PositionColour, Color StatusColour, Color BadgeColour,
+    bool IsListed, string Listing);
 
 public partial class SquadPage : ContentPage
 {
@@ -36,11 +37,12 @@ public partial class SquadPage : ContentPage
         var squad = _session.Squad;
         SquadHeader.Text = $"{club.Name} · {squad.Count} players";
         WageLabel.Text =
-            $"Wage bill {club.Players.Sum(p => p.WeeklyWage):C0}/week · Balance {club.Balance:C0}";
+            $"Wage bill {TransferMarket.Money(club.Players.Sum(p => p.WeeklyWage))}/week · Balance {TransferMarket.Money(club.Balance)}";
 
         foreach (var player in squad)
         {
             _players.Add(new PlayerRow(
+                player.PlayerId,
                 player.Position.ToString(),
                 player.Name,
                 Status(player),
@@ -51,14 +53,35 @@ public partial class SquadPage : ContentPage
                 player.Goals,
                 PositionColour(player.Position),
                 player.Injured ? Color.FromArgb("#B3261E") : Colors.Gray,
-                BadgeColour(player.State)));
+                BadgeColour(player.State),
+                player.ListedForTransfer,
+                $"Transfer listed at {TransferMarket.Money(player.Value)}"));
         }
+    }
+
+    private async void OnPlayerSelected(object? sender, SelectionChangedEventArgs e)
+    {
+        if (e.CurrentSelection.FirstOrDefault() is not PlayerRow row) return;
+        SquadList.SelectedItem = null;
+
+        var confirmed = await DisplayAlertAsync(
+            row.Name,
+            row.IsListed
+                ? "Take this player off the transfer list?"
+                : "Put this player on the transfer list? Other clubs will be able to sign them at their value rather than at a premium.",
+            row.IsListed ? "Remove" : "List",
+            "Cancel");
+
+        if (!confirmed) return;
+
+        _session.ToggleTransferListed(row.PlayerId);
+        OnAppearing();
     }
 
     private static string Status(SquadMember player) =>
         player.Injured
             ? $"Injured · {player.InjuryWeeks} week{(player.InjuryWeeks == 1 ? "" : "s")} out"
-            : $"{player.WeeklyWage:C0}/week";
+            : $"{TransferMarket.Money(player.WeeklyWage)}/week";
 
     private static Color BadgeColour(PlayerState state) => state switch
     {

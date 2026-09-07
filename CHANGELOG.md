@@ -17,6 +17,20 @@
 - Added .NET MAUI (Android/iOS/Mac Catalyst/Windows) and MonoGame (Android/iOS) demo apps under
   `demos/`, sharing a `GameSession` application layer over the engine.
 
+## Transfer market
+
+- Added `TransferMarket`: player valuations from ability, age and remaining potential; asking
+  prices, with a premium for anyone their club has not listed; transfer windows (summer and
+  January); and the wage a player expects.
+- Added `FootballGameEngine.TransferMarketListings`, `QuoteFor` and `Bid`. A bid is validated
+  in full - window, asking price, wages, budget and both squad sizes - before any money moves,
+  so a rejected bid leaves both clubs untouched. Accepted deals rebuild both selections and are
+  reported in the news feed.
+- Added `ListForTransfer` / `WithdrawFromTransferList`, persisted in `GameState`. Nothing lists
+  a player automatically: a squad member reaches the market only when their manager puts them
+  there.
+- Money is formatted in pounds regardless of the device's locale.
+
 ## Player state, substitutes and in-match injuries
 
 - Added `PlayerState` (available, selected, substitute, injured, suspended) and the

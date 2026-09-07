@@ -13,7 +13,7 @@ namespace FootballManagementEngine.MonoGameDemo;
 public sealed class DemoGame : Game
 {
     private enum Screen { Loading, ClubSelect, Hub, Match }
-    private enum HubTab { Table, Squad }
+    private enum HubTab { Table, Squad, Market }
 
     private const int HeaderHeight = 62;
     private const int PickerHeaderHeight = 40;
@@ -36,6 +36,13 @@ public sealed class DemoGame : Game
 
     private readonly ScrollView _clubScroll = new();
     private readonly ScrollView _listScroll = new();
+
+    // The market is rebuilt from every squad in the game, so it is cached rather than
+    // recomputed on each of the sixty frames a second.
+    private List<TransferListing> _market = [];
+    private bool _marketStale = true;
+    private string _marketMessage = "";
+    private float _marketMessageSeconds;
 
     private float _splashSeconds;
 
@@ -134,6 +141,9 @@ public sealed class DemoGame : Game
         }
 
         _batch.End();
+
+        // The tap this frame handled is only discarded now that a frame has drawn.
+        _ui.EndFrame();
         base.Draw(gameTime);
     }
 
@@ -261,7 +271,7 @@ public sealed class DemoGame : Game
         var canPlay = _session.NextFixture is not null;
 
         if (_ui.Button(_batch, play, "PLAY MATCH", canPlay)) StartMatch();
-        if (_ui.Button(_batch, week, "WEEK +1")) _session.AdvanceWeek();
+        if (_ui.Button(_batch, week, "WEEK +1")) { _session.AdvanceWeek(); _marketStale = true; }
 
         // Formation, the same control the MAUI club page offers.
         var formationRow = new Rectangle(8, 160, Ui.CanvasWidth - 16, 26);
@@ -274,15 +284,18 @@ public sealed class DemoGame : Game
             formationRow.Center.X, formationRow.Y + 10, Palette.Text);
 
         // Tabs.
-        var tableTab = new Rectangle(8, 194, 100, 24);
-        var squadTab = new Rectangle(112, 194, 100, 24);
-        DrawTab(tableTab, "TABLE", HubTab.Table);
-        DrawTab(squadTab, "SQUAD", HubTab.Squad);
+        DrawTab(new Rectangle(8, 194, 108, 24), "TABLE", HubTab.Table);
+        DrawTab(new Rectangle(120, 194, 108, 24), "SQUAD", HubTab.Squad);
+        DrawTab(new Rectangle(232, 194, 120, 24), "MARKET", HubTab.Market);
 
         // List.
         var viewport = new Rectangle(0, 224, Ui.CanvasWidth, Ui.CanvasHeight - 224);
-        if (_tab == HubTab.Table) DrawTable(viewport, club.Id, elapsed);
-        else DrawSquad(viewport, elapsed);
+        switch (_tab)
+        {
+            case HubTab.Table: DrawTable(viewport, club.Id, elapsed); break;
+            case HubTab.Squad: DrawSquad(viewport, elapsed); break;
+            case HubTab.Market: DrawMarket(viewport, elapsed); break;
+        }
 
         // No way back to the picker: once a club is chosen, the manager stays at that club.
     }
@@ -292,7 +305,7 @@ public sealed class DemoGame : Game
         var active = _tab == tab;
         _ui.Fill(_batch, rectangle, active ? Palette.Accent : Palette.Panel);
         _ui.TextCentred(_batch, label, rectangle.Center.X, rectangle.Y + 9, active ? Palette.Text : Palette.TextDim);
-        if (_ui.Tapped(rectangle)) { _tab = tab; _listScroll.Reset(); }
+        if (_ui.Tapped(rectangle)) { _tab = tab; _listScroll.Reset(); if (tab == HubTab.Market) _marketStale = true; }
     }
 
     private void DrawTable(Rectangle viewport, string clubId, float elapsed)
@@ -330,40 +343,133 @@ public sealed class DemoGame : Game
         _ui.TextRight(_batch, "PTS", 350, viewport.Y + 5, Palette.TextDim);
     }
 
+    /// <summary>
+    /// The transfer market: who is available, what their club wants, and whether the budget
+    /// covers it. Tapping a row bids the asking price at the wage the player expects.
+    /// </summary>
+    private void DrawMarket(Rectangle viewport, float elapsed)
+    {
+        if (_session?.Club is not { } club) return;
+
+        if (_marketStale)
+        {
+            _market = _session.Market().Take(400).ToList();
+            _marketStale = false;
+        }
+
+        var open = _session.IsTransferWindowOpen;
+
+        _ui.Fill(_batch, new Rectangle(0, viewport.Y, Ui.CanvasWidth, 28), Palette.PanelAlt);
+        _ui.Text(_batch, _session.TransferWindowLabel.ToUpperInvariant(), 8, viewport.Y + 4,
+            open ? Palette.Win : Palette.Loss);
+        _ui.TextRight(_batch, $"BUDGET {Money(_session.TransferBudget)}", Ui.CanvasWidth - 8, viewport.Y + 4, Palette.Text);
+
+        if (_marketMessageSeconds > 0)
+        {
+            _marketMessageSeconds -= elapsed;
+            _ui.Text(_batch, _font.Fit(_marketMessage.ToUpperInvariant(), 344), 8, viewport.Y + 16, Palette.Highlight);
+        }
+        else
+        {
+            _ui.Text(_batch, "TAP A PLAYER TO BID THE ASKING PRICE", 8, viewport.Y + 16, Palette.TextDim);
+        }
+
+        var list = new Rectangle(viewport.X, viewport.Y + 30, viewport.Width, viewport.Height - 30);
+        _listScroll.Update(_ui, list.Height, _market.Count * 22, elapsed);
+
+        var y = list.Y - (int)_listScroll.Offset;
+        foreach (var listing in _market)
+        {
+            var row = new Rectangle(0, y, Ui.CanvasWidth, 22);
+            if (y + 22 > list.Y && y < list.Bottom)
+            {
+                var affordable = listing.AskingPrice <= _session.TransferBudget;
+                if (listing.ListedByClub) _ui.Fill(_batch, row, Palette.Panel);
+
+                _ui.Text(_batch, listing.Position.ToString(), 8, y + 7, PositionColour(listing.Position));
+                _ui.Text(_batch, _font.Fit(listing.PlayerName.ToUpperInvariant(), 118), 40, y + 7, Palette.Text);
+                _ui.Text(_batch, _font.Fit(listing.ClubName.ToUpperInvariant(), 70), 166, y + 7, Palette.TextDim);
+                _ui.TextRight(_batch, $"{listing.Overall}", 262, y + 7, Palette.TextDim);
+                _ui.TextRight(_batch, Money(listing.AskingPrice), 352, y + 7,
+                    affordable && open ? Palette.Win : Palette.TextDim);
+            }
+
+            if (_ui.Tapped(row, list))
+            {
+                var response = _session.SignPlayer(listing.PlayerId);
+                _marketMessage = response.Message;
+                _marketMessageSeconds = 4f;
+                if (response.Accepted) _marketStale = true;
+                return;
+            }
+
+            y += 22;
+        }
+
+        if (_market.Count == 0)
+            _ui.TextCentred(_batch, "NOBODY AVAILABLE", Ui.CanvasWidth / 2, list.Y + 20, Palette.TextDim);
+    }
+
+    /// <summary>Fees read better as 12.5M than as a row of digits on a phone.</summary>
+    private static string Money(decimal amount) =>
+        amount >= 1_000_000m ? $"\u00A3{amount / 1_000_000m:0.#}M"
+        : amount >= 1_000m ? $"\u00A3{amount / 1_000m:0}K"
+        : $"\u00A3{amount:0}";
+
     private void DrawSquad(Rectangle viewport, float elapsed)
     {
         if (_session is null) return;
 
-        const int stateColumn = 232;
+        const int stateColumn = 196;
+        const int listColumn = 240;
 
         var squad = _session.Squad;
-        var list = new Rectangle(viewport.X, viewport.Y + 16, viewport.Width, viewport.Height - 16);
+
+        _ui.Fill(_batch, new Rectangle(0, viewport.Y, Ui.CanvasWidth, 14), Palette.Background);
+        _ui.Text(_batch, "TAP A PLAYER TO PUT THEM ON THE TRANSFER LIST", 8, viewport.Y + 4, Palette.TextDim);
+
+        var header = viewport.Y + 14;
+        var list = new Rectangle(viewport.X, header + 16, viewport.Width, viewport.Height - 30);
         _listScroll.Update(_ui, list.Height, squad.Count * 22, elapsed);
 
         var y = list.Y - (int)_listScroll.Offset;
         foreach (var player in squad)
         {
+            var row = new Rectangle(0, y, Ui.CanvasWidth, 22);
             if (y + 22 > list.Y && y < list.Bottom)
             {
+                if (player.ListedForTransfer) _ui.Fill(_batch, row, Palette.Panel);
+
                 _ui.Text(_batch, player.Position.ToString(), 8, y + 7, PositionColour(player.Position));
-                _ui.Text(_batch, _font.Fit(player.Name.ToUpperInvariant(), 176), 40, y + 7,
+                _ui.Text(_batch, _font.Fit(player.Name.ToUpperInvariant(), 140), 40, y + 7,
                     player.Injured ? Palette.Loss : Palette.Text);
                 _ui.TextCentred(_batch, player.Badge, stateColumn, y + 7, StateColour(player.State));
-                _ui.TextRight(_batch, $"{player.Overall}", 280, y + 7, Palette.TextDim);
-                _ui.TextRight(_batch, $"{player.Appearances}", 318, y + 7, Palette.TextDim);
+                if (player.ListedForTransfer)
+                    _ui.TextCentred(_batch, Money(player.Value), listColumn, y + 7, Palette.Highlight);
+                _ui.TextRight(_batch, $"{player.Overall}", 292, y + 7, Palette.TextDim);
+                _ui.TextRight(_batch, $"{player.Appearances}", 324, y + 7, Palette.TextDim);
                 _ui.TextRight(_batch, $"{player.Goals}", 352, y + 7,
                     player.Goals > 0 ? Palette.Highlight : Palette.TextDim);
             }
+
+            if (_ui.Tapped(row, list))
+            {
+                _session.ToggleTransferListed(player.PlayerId);
+                _marketStale = true;
+                return;
+            }
+
             y += 22;
         }
 
         // Drawn last so a scrolled row cannot paint over it.
-        _ui.Fill(_batch, new Rectangle(0, viewport.Y, Ui.CanvasWidth, 16), Palette.PanelAlt);
-        _ui.Text(_batch, "PLAYER", 40, viewport.Y + 5, Palette.TextDim);
-        _ui.TextCentred(_batch, "STATE", stateColumn, viewport.Y + 5, Palette.TextDim);
-        _ui.TextRight(_batch, "OVR", 280, viewport.Y + 5, Palette.TextDim);
-        _ui.TextRight(_batch, "APP", 318, viewport.Y + 5, Palette.TextDim);
-        _ui.TextRight(_batch, "GLS", 352, viewport.Y + 5, Palette.TextDim);
+        _ui.Fill(_batch, new Rectangle(0, header, Ui.CanvasWidth, 16), Palette.PanelAlt);
+        _ui.Text(_batch, "PLAYER", 40, header + 5, Palette.TextDim);
+        _ui.TextCentred(_batch, "STATE", stateColumn, header + 5, Palette.TextDim);
+        _ui.TextCentred(_batch, "LISTED", listColumn, header + 5, Palette.TextDim);
+        _ui.TextRight(_batch, "OVR", 292, header + 5, Palette.TextDim);
+        _ui.TextRight(_batch, "APP", 324, header + 5, Palette.TextDim);
+        _ui.TextRight(_batch, "GLS", 352, header + 5, Palette.TextDim);
     }
 
     private void DrawMatch()
@@ -509,6 +615,7 @@ public sealed class DemoGame : Game
         _pendingInjuries.AddRange(_session.InjuriesIn(_match));
         _awaitingSubstitution = null;
 
+        _marketStale = true;
         if (_match is not null) _screen = Screen.Match;
     }
 

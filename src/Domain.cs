@@ -221,4 +221,6 @@ public sealed class GameState
     public List<string> News { get; init; } = new();
     /// <summary>Season aggregates are persisted so clients can query player statistics without rebuilding them.</summary>
     public Dictionary<string, PlayerSeasonStats> PlayerStats { get; init; } = new();
+    /// <summary>Players their club has actively put up for sale, and so will part with more cheaply.</summary>
+    public HashSet<string> TransferListed { get; init; } = new();
 }

@@ -320,7 +320,9 @@ main build stays fast:
 
 Both cover team selection: the engine tracks each player's state (available, selected,
 substitute, injured or suspended), names an eleven and four substitutes from squad order, and
-lets a manager pick the replacement when someone limps off mid-match.
+lets a manager pick the replacement when someone limps off mid-match. Both also open onto the
+transfer market, where players are valued from ability, age and potential, the window opens in
+summer and January, and a club's own players reach the market only when their manager lists them.
 
 ```bash
 dotnet build FootballManagementEngine.Demos.slnx

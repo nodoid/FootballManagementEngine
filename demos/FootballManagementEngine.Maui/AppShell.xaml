@@ -12,6 +12,7 @@
         <ShellContent Title="Fixtures" ContentTemplate="{DataTemplate pages:FixturesPage}" Route="fixtures" />
         <ShellContent Title="Table" ContentTemplate="{DataTemplate pages:TablePage}" Route="table" />
         <ShellContent Title="Squad" ContentTemplate="{DataTemplate pages:SquadPage}" Route="squad" />
+        <ShellContent Title="Transfers" ContentTemplate="{DataTemplate pages:TransfersPage}" Route="transfers" />
     </TabBar>
 
 </Shell>

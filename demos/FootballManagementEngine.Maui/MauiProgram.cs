@@ -24,6 +24,7 @@ public static class MauiProgram
         builder.Services.AddSingleton<FixturesPage>();
         builder.Services.AddSingleton<TablePage>();
         builder.Services.AddSingleton<SquadPage>();
+        builder.Services.AddSingleton<TransfersPage>();
 
 #if DEBUG
         builder.Logging.AddDebug();
