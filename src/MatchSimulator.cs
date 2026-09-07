@@ -49,7 +49,7 @@ public sealed class MatchSimulator
 
         var hg = Poisson(homeXg);
         var ag = Poisson(awayXg);
-        var highlights = options.IncludeHighlights
+        IReadOnlyList<MatchHighlight> highlights = options.IncludeHighlights
             ? CreateHighlights(fixture, home, away, hg, ag, options)
             : Array.Empty<MatchHighlight>();
 
@@ -63,7 +63,7 @@ public sealed class MatchSimulator
         };
     }
 
-    private IReadOnlyList<MatchHighlight> CreateHighlights(
+    private List<MatchHighlight> CreateHighlights(
         Fixture fixture, Team home, Team away, int homeGoals, int awayGoals,
         MatchSimulationOptions options)
     {
@@ -120,7 +120,7 @@ public sealed class MatchSimulator
         return _rng.Next(min, max + 1);
     }
 
-    private int TeamStrength(Team t)
+    private static int TeamStrength(Team t)
     {
         if (t.Players.Count == 0) return t.Reputation;
         var available = t.Players.Where(p => !p.Injured && p.SuspensionMatches == 0).ToList();

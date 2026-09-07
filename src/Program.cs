@@ -17,9 +17,12 @@ if (!load)
     season.GenerateDomesticSeason();
     season.GenerateFaCup();
 
-    game.State.Competitions["UCL"].TeamIds.AddRange(new[] { "ARS", "LIV", "MCI", "MUN", "CHE", "NEW" });
-    game.State.Competitions["UEL"].TeamIds.AddRange(new[] { "AVL", "TOT", "BHA", "WHU" });
-    game.State.Competitions["UECL"].TeamIds.AddRange(new[] { "CRY", "FUL" });
+    string[] uclTeams = ["ARS", "LIV", "MCI", "MUN", "CHE", "NEW"];
+    string[] uelTeams = ["AVL", "TOT", "BHA", "WHU"];
+    string[] ueclTeams = ["CRY", "FUL"];
+    game.State.Competitions["UCL"].TeamIds.AddRange(uclTeams);
+    game.State.Competitions["UEL"].TeamIds.AddRange(uelTeams);
+    game.State.Competitions["UECL"].TeamIds.AddRange(ueclTeams);
     season.GenerateEuropeanFixtures();
     game.Save(slot);
 }

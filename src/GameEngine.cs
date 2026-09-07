@@ -16,6 +16,12 @@ public sealed class FootballGameEngine
         Converters = { new JsonStringEnumConverter() }
     };
 
+    private static readonly JsonSerializerOptions ImportOptions = new()
+    {
+        PropertyNameCaseInsensitive = true,
+        Converters = { new JsonStringEnumConverter() }
+    };
+
     public FootballGameEngine(GameState? state = null, GamePersistence? persistence = null, bool autoSave = false)
     {
         State = state ?? new GameState();
@@ -42,11 +48,11 @@ public sealed class FootballGameEngine
     private void InitialisePlayerStats()
     {
         foreach (var team in State.Teams.Values)
-        foreach (var player in team.Players)
-        {
-            if (!State.PlayerStats.ContainsKey(player.Id))
-                State.PlayerStats[player.Id] = new PlayerSeasonStats { PlayerId = player.Id, TeamId = team.Id, Season = State.Season };
-        }
+            foreach (var player in team.Players)
+            {
+                if (!State.PlayerStats.ContainsKey(player.Id))
+                    State.PlayerStats[player.Id] = new PlayerSeasonStats { PlayerId = player.Id, TeamId = team.Id, Season = State.Season };
+            }
     }
 
     public void AddTeam(Team team)
@@ -92,7 +98,7 @@ public sealed class FootballGameEngine
     {
         var player = State.Teams.Values.SelectMany(t => t.Players).SingleOrDefault(p => p.Id == playerId)
             ?? throw new KeyNotFoundException($"Player '{playerId}' not found.");
-        if (weeks < 0) throw new ArgumentOutOfRangeException(nameof(weeks));
+        ArgumentOutOfRangeException.ThrowIfNegative(weeks);
         player.Injured = weeks > 0;
         player.InjuryWeeks = weeks;
         if (weeks > 0 && State.PlayerStats.TryGetValue(player.Id, out var stats)) stats.Injuries++;
@@ -176,7 +182,7 @@ public sealed class FootballGameEngine
         return result;
     }
 
-    private MatchResult ResolveKnockoutDraw(
+    private static MatchResult ResolveKnockoutDraw(
         MatchResult result, Fixture fixture, Team home, Team away,
         CompetitionMatchRules rules, MatchSimulationOptions? options)
     {
@@ -371,13 +377,8 @@ public sealed class FootballGameEngine
 
     public static FootballGameEngine ImportState(string json, GamePersistence? persistence = null, bool autoSave = false)
     {
-        var state = JsonSerializer.Deserialize<GameState>(
-            json,
-            new JsonSerializerOptions
-            {
-                PropertyNameCaseInsensitive = true,
-                Converters = { new JsonStringEnumConverter() }
-            }) ?? throw new ArgumentException("Invalid save game.");
+        var state = JsonSerializer.Deserialize<GameState>(json, ImportOptions)
+            ?? throw new ArgumentException("Invalid save game.");
 
         return new FootballGameEngine(state, persistence, autoSave);
     }
